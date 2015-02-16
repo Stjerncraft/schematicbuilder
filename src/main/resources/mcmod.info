@@ -1,0 +1,16 @@
+[
+{
+  "modid": "schematicbuilder",
+  "name": "Schematic Builder",
+  "description": "Allows you to automatically build constructions from Schematic files.",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "http://mods.stjerncraft.com/schematicbuilder",
+  "updateUrl": "http://mods.stjerncraft.com/schematicbuilder",
+  "authorList": ["Wildex999"],
+  "credits": "Schematica for the initial idea, and some code for reading Schematic files.",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
