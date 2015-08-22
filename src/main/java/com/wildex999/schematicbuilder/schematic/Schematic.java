@@ -3,7 +3,10 @@ package com.wildex999.schematicbuilder.schematic;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+
+import org.apache.commons.lang3.mutable.MutableInt;
 
 import com.wildex999.utils.ModLog;
 
@@ -17,7 +20,9 @@ import net.minecraft.nbt.NBTTagCompound;
 
 public class Schematic {
 	
+	public int serializedVersion = 1; //Used to handle backwards compatibility for server saved Schematics
 	public String name;
+	public String author;
 	
 	private int width;
 	private int height;
@@ -29,6 +34,9 @@ public class Schematic {
 		this.width = width;
 		this.height = height;
 		this.length = length;
+		
+		name = "";
+		author = "";
 		
 		int count = width*height*length;
 		blocks = new ArrayList<SchematicBlock>(count);
@@ -75,9 +83,11 @@ public class Schematic {
 		return blocks;
 	}
 	
-	//Network Serializing
+	//Serializing
 	public void toBytes(ByteBuf buf) {
+		buf.writeInt(serializedVersion);
 		ByteBufUtils.writeUTF8String(buf, name);
+		ByteBufUtils.writeUTF8String(buf, author);
 		buf.writeInt(width);
 		buf.writeInt(height);
 		buf.writeInt(length);
@@ -113,17 +123,23 @@ public class Schematic {
 		//Write Entities
 	}
 	
-	public static Schematic fromBytes(ByteBuf buf) {
+	public static Schematic fromBytes(ByteBuf buf, HashMap<Short, MutableInt> blockCount) {
 		Schematic newSchematic;
 		FMLControlledNamespacedRegistry<Block> BlockRegistry = GameData.getBlockRegistry();
 		
+		int serializedVersion = buf.readInt();
 		String name = ByteBufUtils.readUTF8String(buf);
+		String author = ByteBufUtils.readUTF8String(buf);
 		int width = buf.readInt();
 		int height = buf.readInt();
 		int length = buf.readInt();
 		
 		newSchematic = new Schematic(width, height, length);
+		newSchematic.serializedVersion = serializedVersion;
 		newSchematic.name = name;
+		newSchematic.author = author;
+		
+		//TODO: Handle loading old serialized Schematic versions
 		
 		//Read Blocks
 		for(int x = 0; x < width; x++)
@@ -141,6 +157,19 @@ public class Schematic {
 
 					Block block = BlockRegistry.getRaw(blockId); //Allow it to return null for unknown ID
 					newSchematic.setBlock(x, y, z, block, meta);
+					
+					if(blockCount != null && block != null)
+					{
+						if(blockId >= SchematicLoader.maxBlockId)
+							System.out.println("Over block id for block: " + block);
+						
+						short index = (short) ((blockId << 4) | meta);
+						MutableInt count = blockCount.get(index);
+						if(count != null)
+							blockCount.get(index).increment();
+						else
+							blockCount.put(index, new MutableInt(0));
+					}
 				}
 			}
 		}

@@ -1,8 +1,10 @@
 package com.wildex999.schematicbuilder.network;
 
+import java.io.ByteArrayOutputStream;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;

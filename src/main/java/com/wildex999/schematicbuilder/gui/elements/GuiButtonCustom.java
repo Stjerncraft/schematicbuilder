@@ -1,5 +1,7 @@
 package com.wildex999.schematicbuilder.gui.elements;
 
+import java.util.ArrayList;
+
 import org.lwjgl.opengl.GL11;
 
 import net.minecraft.client.Minecraft;
@@ -19,6 +21,8 @@ public class GuiButtonCustom extends GuiButton {
 	public int texWidth;
 	public int texHeight;
 	public ResourceLocation texture;
+	
+	public int data; //Custom data bound to button
 	
 	public int enabledColor;
 	public int disabledColor;
@@ -63,6 +67,12 @@ public class GuiButtonCustom extends GuiButton {
 
             this.drawCenteredString(fontrenderer, this.displayString, this.xPosition + this.width / 2, this.yPosition + (this.height - 8) / 2, l);
         }
+	}
+	
+	public boolean isOver(int mouseX, int mouseY) {
+		if(mouseX >= this.xPosition && mouseY >= this.yPosition && mouseX < this.xPosition + this.width && mouseY < this.yPosition + this.height)
+			return true;
+		return false;
 	}
 
 }

@@ -1,9 +1,12 @@
 package com.wildex999.schematicbuilder.blocks;
 
+import java.util.ArrayList;
+
 import javax.swing.JFileChooser;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
-import com.wildex999.schematicbuilder.gui.SchematicBuilderGui;
+import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
+import com.wildex999.schematicbuilder.items.ItemSchematicBuilder;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import com.wildex999.utils.FileChooser;
 import com.wildex999.utils.ModLog;
@@ -14,7 +17,9 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.tileentity.TileEntityFlowerPot;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
@@ -29,7 +34,7 @@ public class BlockSchematicBuilder extends BlockBase {
 		this.setCreativeTab(CreativeTabs.tabBlock);
 		this.setStepSound(Block.soundTypeMetal);
 		
-		BlockLibrary.register(this);
+		BlockLibrary.register(this, ItemSchematicBuilder.class);
 		registerTile(TileSchematicBuilder.class);
 	}
 	
@@ -48,7 +53,7 @@ public class BlockSchematicBuilder extends BlockBase {
 	@Override
     public boolean onBlockActivated(World world, int blockX, int blockY, int blockZ, EntityPlayer player, int side, float offX, float offY, float offZ)
     {
-		player.openGui(ModSchematicBuilder.instance, SchematicBuilderGui.GUI_ID, world, blockX, blockY, blockZ);
+		player.openGui(ModSchematicBuilder.instance, GuiSchematicBuilder.GUI_ID, world, blockX, blockY, blockZ);
         return true;
     }
 	
@@ -62,6 +67,30 @@ public class BlockSchematicBuilder extends BlockBase {
         //2 = North
         //3 = East
         world.setBlockMetadataWithNotify(x, y, z, placerFacing, 2);
+        
+        //Set the previous Schematic
+        if(item.hasTagCompound())
+        {
+        	TileEntity te = world.getTileEntity(x, y, z);
+        	if(te == null || !(te instanceof TileSchematicBuilder))
+        	{
+        		System.err.println("Expected TileSchematicBuilder at(xyz) " + x + " " + y + " " + z);
+        		return;
+        	}
+        	TileSchematicBuilder tileBuilder = (TileSchematicBuilder) te;
+        	
+        	NBTTagCompound nbt = item.getTagCompound();
+        	String cachedFile = nbt.getString("cachedSchematicFile");
+        	String schematicName = nbt.getString("schematicName");
+        	
+        	if(!cachedFile.trim().isEmpty())
+        		tileBuilder.onPlaceCached(cachedFile, schematicName);
+        	
+        	if(ModSchematicBuilder.useEnergy)
+        	{
+        		tileBuilder.energyStorage.setEnergyStored(nbt.getInteger("energy"));
+        	}
+        }
 	}
 	
 	@Override
@@ -76,4 +105,59 @@ public class BlockSchematicBuilder extends BlockBase {
 		
 		super.breakBlock(world, x, y, z, block, metadata);
 	}
+	
+	/*
+	 * Drop BlockSchematicBuilder with the loaded Schematic on it
+	 */
+	@Override
+    public ArrayList<ItemStack> getDrops(World world, int x, int y, int z, int metadata, int fortune)
+    {
+		TileEntity te = world.getTileEntity(x, y, z);
+		ArrayList<ItemStack> dropItems = super.getDrops(world, x, y, z, metadata, fortune);
+		if(te == null || !(te instanceof TileSchematicBuilder))
+		{
+			System.err.println("Failed to drop SchematicBuilder TileEntity due to it no longer existing where expected(xyz): " + x + " " + y + " " + z);
+			return dropItems;
+		}
+		TileSchematicBuilder tileBuilder = (TileSchematicBuilder) te;
+		
+		//Add NBT data to item
+		if(dropItems.isEmpty()) //Assert: Should not happen
+			return dropItems;
+		
+		ItemStack dropItem = dropItems.get(0);
+		if(!dropItem.hasTagCompound())
+			dropItem.setTagCompound(new NBTTagCompound());
+		NBTTagCompound nbt = dropItem.getTagCompound();
+		
+		nbt.setString("cachedSchematicFile", tileBuilder.cachedSchematicFile);
+		if(tileBuilder.loadedSchematic == null)
+			nbt.setString("schematicName", "None");
+		else
+			nbt.setString("schematicName", tileBuilder.loadedSchematic.name);
+		if(ModSchematicBuilder.useEnergy)
+		{
+			nbt.setInteger("energy", tileBuilder.energyStorage.getEnergyStored());
+		}
+		
+		return dropItems;
+    }
+    @Override
+    public boolean removedByPlayer(World world, EntityPlayer player, int x, int y, int z, boolean willHarvest)
+    {
+        if (willHarvest) return true; //If it will harvest, delay deletion of the block until after getDrops
+        return super.removedByPlayer(world, player, x, y, z, willHarvest);
+    }
+    /**
+     * Called when the player destroys a block with an item that can harvest it. (i, j, k) are the coordinates of the
+     * block and l is the block's subtype/damage.
+     */
+    @Override
+    public void harvestBlock(World world, EntityPlayer player, int x, int y, int z, int meta)
+    {
+        super.harvestBlock(world, player, x, y, z, meta);
+        world.setBlockToAir(x, y, z);
+    }
+	
+	
 }

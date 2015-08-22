@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
+import net.minecraft.block.Block;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
@@ -21,7 +22,8 @@ public class MessageActionSchematicBuilder extends MessageBase {
 
 	public enum ActionType {
 		BUILD(0),
-		STOP(1);
+		STOP(1),
+		CONFIG(2);
 		
 		private final int value;
 		
@@ -48,6 +50,7 @@ public class MessageActionSchematicBuilder extends MessageBase {
 	
 	private ActionType action;
 	private TileEntityInfo tileInfo;
+	private TileSchematicBuilder.Config config;
 	
 	//Receive Constructor
 	public MessageActionSchematicBuilder() {
@@ -59,16 +62,32 @@ public class MessageActionSchematicBuilder extends MessageBase {
 		this.action = action;
 	}
 	
+	//Send Config constructor
+	public MessageActionSchematicBuilder(TileEntity tile, TileSchematicBuilder.Config config) {
+		tileInfo = new TileEntityInfo(tile);
+		this.action = ActionType.CONFIG;
+		this.config = config;
+	}
+	
 	@Override
 	public void fromBytes(ByteBuf buf) {
 		tileInfo = readTileEntity(buf);
 		action = ActionType.fromValue(buf.readInt());
+		
+		if(action == ActionType.CONFIG)
+		{
+			config = new TileSchematicBuilder.Config();
+			config.fromBytes(buf);
+		}
 	}
 
 	@Override
 	public void toBytes(ByteBuf buf) {
 		writeTileEntity(buf, tileInfo);
 		buf.writeInt(action.getValue());
+		
+		if(action == ActionType.CONFIG)
+			config.toBytes(buf);
 	}
 	
 	public static class Handler implements IMessageHandler<MessageActionSchematicBuilder, IMessage> {
@@ -88,6 +107,9 @@ public class MessageActionSchematicBuilder extends MessageBase {
         		break;
         	case STOP:
         		tile.actionStop();
+        		break;
+        	case CONFIG:
+        		tile.actionConfig(message.config);
         		break;
         	}
         	

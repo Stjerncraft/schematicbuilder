@@ -17,12 +17,12 @@ buildscript {
 
 apply plugin: 'forge'
 
-version = "0.2.0"
+version = "0.2.1"
 group= "com.wildex999.schematicbuilder" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = "schematicbuilder"
 
 minecraft {
-    version = "1.7.10-10.13.2.1291"
+    version = "1.7.10-10.13.4.1448-1.7.10"
     runDir = "eclipse"
 }
 

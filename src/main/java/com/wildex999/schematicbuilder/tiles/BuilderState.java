@@ -11,7 +11,7 @@ public enum BuilderState {
 	LOADING(3), //Loading/Parsing Schematic from NBT
 	UPLOADING(4), //Client: Uploading to server
 	DOWNLOADING(5), //Downloading from Server/Client
-	PREPARING(6), //Creating list of materials etc.(Spread over multiple ticks)
+	PREPARING(6), //Parsing, Creating list of materials etc.(Spread over multiple ticks)
 	READY(7), //Schematic loaded, and ready to build
 	CLEARING(8), //Clearing space for building
 	CHECKING(9), //Checking for already placed blocks(Run after server restart/TileEntity reload, before continuing to build)

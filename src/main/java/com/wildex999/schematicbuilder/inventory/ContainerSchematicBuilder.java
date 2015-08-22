@@ -23,7 +23,7 @@ public class ContainerSchematicBuilder extends Container {
 		this.playerInventory = playerInventory;
 		
 		initPlayerInventory(playerInventory, 8, 158);
-		initContainerInventory(tile.getInventory(), 8, 84);
+		initContainerInventory(tile.getInventory(), 8, 158);
 		
 		if(tile instanceof IGuiWatchers)
 			((IGuiWatchers)tile).addWatcher(playerInventory.player);
@@ -53,11 +53,7 @@ public class ContainerSchematicBuilder extends Container {
 	
 	//Initialize the Container inventory
 	protected void initContainerInventory(IInventory inventory, int invX, int invY) {
-		for (int i = 0; i < 3; ++i)
-        {
-            for (int j = 0; j < slotsPerRow; ++j)
-                this.addSlotToContainer(new Slot(inventory, j + i * slotsPerRow, invX + j * slotSize, invY + i * slotSize));
-        }
+		this.addSlotToContainer(new Slot(inventory, 0, invX, invY));
 	}
 	
 	

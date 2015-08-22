@@ -1,9 +1,11 @@
 package com.wildex999.schematicbuilder.network;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.tiles.BuilderState;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
@@ -20,8 +22,10 @@ import io.netty.buffer.ByteBuf;
 public class MessageUpdateSchematicBuilder extends MessageBase {
 	
 	enum UpdateType {
-		FULL(0), //State, message and name
-		MESSAGE(1); //State and message
+		FULL(0), //State, schematic id, message and name
+		MESSAGE(1), //State and message
+		CONFIG(2), //Config Update
+		RESOURCE(3); //Resources update
 		
 		private final int value;
 		
@@ -50,18 +54,35 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	
 	BuilderState newState;
 	String schematicName;
+	String schematicAuthor;
+	String schematicId;
+	int schematicWidth, schematicHeight, schematicLength;
 	String message;
 	UpdateType updateType;
+	TileSchematicBuilder.Config config;
+	
+	int energyMax;
+	int energyCurrent;
+	ArrayList<ResourceItem> resources;
 	
 	//Receive Constructor
 	public MessageUpdateSchematicBuilder() {}
 	
 	//Send Constructor(FULL)
-	public MessageUpdateSchematicBuilder(TileEntity tile, BuilderState state, String name, String message) {
+	public MessageUpdateSchematicBuilder(TileEntity tile, BuilderState state, String name, String author, String message, String schematicId, int width, int height, int length, TileSchematicBuilder.Config config) {
 		tileInfo = new TileEntityInfo(tile);
 		newState = state;
 		schematicName = name;
+		schematicAuthor = author;
+		schematicWidth = width;
+		schematicHeight = height;
+		schematicLength = length;
+		if(schematicId != null)
+			this.schematicId = schematicId;
+		else
+			this.schematicId = "";
 		this.message = message;
+		this.config = config;
 		updateType = UpdateType.FULL;
 	}
 	
@@ -73,12 +94,33 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 		updateType = UpdateType.MESSAGE;
 	}
 	
+	//Send Constructor(CONFIG)
+	public MessageUpdateSchematicBuilder(TileEntity tile, TileSchematicBuilder.Config config) {
+		tileInfo = new TileEntityInfo(tile);
+		this.config = config;
+		updateType = UpdateType.CONFIG;
+	}
+	
+	//Send Constructor(RESOURCE)
+	public MessageUpdateSchematicBuilder(TileEntity tile, int currentEnergy, int maxEnergy, ArrayList<ResourceItem> resources)
+	{
+		tileInfo = new TileEntityInfo(tile);
+		energyCurrent = currentEnergy;
+		energyMax = maxEnergy;
+		this.resources = resources;
+		updateType = UpdateType.RESOURCE;
+	}
+	
 	@Override
 	public void fromBytes(ByteBuf buf) {
 		tileInfo = readTileEntity(buf);
 		
 		updateType = UpdateType.fromValue(buf.readInt());
 		switch(updateType) {
+		case CONFIG:
+			config = new TileSchematicBuilder.Config();
+			config.fromBytes(buf);
+			break;
 		case MESSAGE:
 			newState = BuilderState.fromValue(buf.readInt());
 			message = ByteBufUtils.readUTF8String(buf);
@@ -87,6 +129,18 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 			newState = BuilderState.fromValue(buf.readInt());
 			message = ByteBufUtils.readUTF8String(buf);
 			schematicName = ByteBufUtils.readUTF8String(buf);
+			schematicAuthor = ByteBufUtils.readUTF8String(buf);
+			schematicId = ByteBufUtils.readUTF8String(buf);
+			schematicWidth = buf.readInt();
+			schematicHeight = buf.readInt();
+			schematicLength = buf.readInt();
+			config = new TileSchematicBuilder.Config();
+			config.fromBytes(buf);
+			break;
+		case RESOURCE:
+			energyCurrent = buf.readInt();
+			energyMax = buf.readInt();
+			//TODO: Read Resources
 			break;
 		}
 	}
@@ -97,6 +151,9 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 		
 		buf.writeInt(updateType.getValue());
 		switch(updateType) {
+		case CONFIG:
+			config.toBytes(buf);
+			break;
 		case MESSAGE:
 			buf.writeInt(newState.getValue());
 			ByteBufUtils.writeUTF8String(buf, message);
@@ -105,6 +162,17 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 			buf.writeInt(newState.getValue());
 			ByteBufUtils.writeUTF8String(buf, message);
 			ByteBufUtils.writeUTF8String(buf, schematicName);
+			ByteBufUtils.writeUTF8String(buf, schematicAuthor);
+			ByteBufUtils.writeUTF8String(buf, schematicId);
+			buf.writeInt(schematicWidth);
+			buf.writeInt(schematicHeight);
+			buf.writeInt(schematicLength);
+			config.toBytes(buf);
+			break;
+		case RESOURCE:
+			buf.writeInt(energyCurrent);
+			buf.writeInt(energyMax);
+			//TODO: Write resources
 			break;
 		}
 	}
@@ -124,10 +192,16 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
         	switch(message.updateType)
         	{
         	case FULL:
-        		tile.networkUpdateFull(message.newState, message.schematicName, message.message);
+        		tile.networkUpdateFull(message.newState, message.schematicName, message.schematicAuthor, message.message, message.schematicId, message.schematicWidth, message.schematicHeight, message.schematicLength, message.config);
         		break;
         	case MESSAGE:
         		tile.networkUpdateMessage(message.newState, message.message);
+        		break;
+        	case CONFIG:
+        		tile.networkUpdateConfig(message.config);
+        		break;
+        	case RESOURCE:
+        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, null);
         		break;
         	}
         	
