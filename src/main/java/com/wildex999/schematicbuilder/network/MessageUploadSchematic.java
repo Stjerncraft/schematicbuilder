@@ -17,6 +17,7 @@ import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
+import cpw.mods.fml.relauncher.Side;
 import io.netty.buffer.ByteBuf;
 
 //Upload Schematic to server
@@ -59,7 +60,7 @@ public class MessageUploadSchematic extends MessageBase {
 		}
 	};
 	
-	public static int packetSize = 30000;
+	public static int packetSize = 1024; //TODO: Config option
 	
 	TileEntityInfo tileInfo;
 	UploadType type;
@@ -67,6 +68,7 @@ public class MessageUploadSchematic extends MessageBase {
 	
 	int size;
 	byte[] data;
+	boolean abort;
 	
 	//Receive Constructor
 	public MessageUploadSchematic() {
@@ -88,8 +90,9 @@ public class MessageUploadSchematic extends MessageBase {
 	}
 	
 	//Send Constructor(End)
-	public MessageUploadSchematic(TileEntity tile) {
+	public MessageUploadSchematic(TileEntity tile, boolean abort) {
 		tileInfo = new TileEntityInfo(tile);
+		this.abort = abort;
 		type = UploadType.END;
 	}
 	
@@ -107,6 +110,7 @@ public class MessageUploadSchematic extends MessageBase {
 			buf.readBytes(data);
 			break;
 		case END:
+			abort = buf.readBoolean();
 			break;
 		}
 	}
@@ -125,6 +129,7 @@ public class MessageUploadSchematic extends MessageBase {
 			buf.writeBytes(data);
 			break;
 		case END:
+			buf.writeBoolean(abort);
 			break;
 		}
 	}
@@ -140,17 +145,30 @@ public class MessageUploadSchematic extends MessageBase {
         		return null;
         	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
 
-        	EntityPlayerMP player = ctx.getServerHandler().playerEntity;
+        	EntityPlayerMP player;
+        	if(ctx.side == Side.SERVER)
+        		player = ctx.getServerHandler().playerEntity;
+        	else
+        		player = null;
         	
         	switch(message.type) {
         	case START:
-        		tile.networkOnUploadStart(message.size, player);
+        		if(ctx.side == Side.SERVER)
+        			tile.networkOnUploadStart(message.size, player);
+        		else
+        			tile.networkOnDownloadStart(message.size);
         		break;
         	case DATA:
-        		tile.networkOnUploadData(message.data, player);
+        		if(ctx.side == Side.SERVER)
+        			tile.networkOnUploadData(message.data, player);
+        		else
+        			tile.networkOnDownloadData(message.data);
         		break;
         	case END:
-        		tile.networkOnUploadEnd(player);
+        		if(ctx.side == Side.SERVER)
+        			tile.networkOnUploadEnd(player, message.abort);
+        		else
+        			tile.networkOnDownloadEnd(message.abort);
         		break;
         	}
         	

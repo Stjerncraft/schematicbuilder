@@ -43,16 +43,12 @@ public class WorldSchematicVisualizer {
 		GL11.glEnable(GL11.GL_CULL_FACE);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glDisable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_COLOR);
-        //GL11.glEnable(GL11.GL_COLOR);
-        //GL11.glAlphaFunc(GL11.GL_GREATER, 0.5F);
-        //GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-        //GL11.glEnable(GL11.GL_FOG);
-
+        
 		renderVisualize();
 		renderFrame();
-		GL11.glPopMatrix();
+		
 		GL11.glEnable(GL11.GL_ALPHA_TEST);
+		GL11.glPopMatrix();
 	}
 	
 	public void renderVisualize() {
@@ -152,9 +148,6 @@ public class WorldSchematicVisualizer {
 		
 		Minecraft mc = Minecraft.getMinecraft();
 		EntityClientPlayerMP player = mc.thePlayer;
-		int ambientOcclusion = Minecraft.getMinecraft().gameSettings.ambientOcclusion;
-		mc.gameSettings.ambientOcclusion = 0; //Don't do light level checks
-		
 		
 		fTile.updateDirection();
 		
@@ -165,6 +158,7 @@ public class WorldSchematicVisualizer {
 			Tessellator.instance.setTranslation(fTile.buildX - player.posX, fTile.yCoord - player.posY, (fTile.buildZ+1) - player.posZ);
 		Tessellator t = Tessellator.instance;
 
+		t.setColorRGBA(255, 255, 255, 128);
 		//Draw Cube
 		//Front
 		t.addVertex(schematic.getWidth(), 0, schematic.getLength());
@@ -209,8 +203,6 @@ public class WorldSchematicVisualizer {
 		Tessellator.instance.draw();
 		Tessellator.instance.setTranslation(0, 0, 0);
 		GL11.glDisable(GL11.GL_BLEND);
-		
-		mc.gameSettings.ambientOcclusion = ambientOcclusion;
 
 	}
 }

@@ -59,6 +59,7 @@ public class GuiSchematicBuilder implements IGuiHandler
 		public int colorText = 4210752;
 		public int colorOk = 0x47D147;
 		public int colorError = 0xFF6600;
+		public int colorWhite = 0xFFFFFFFF;
 		
 		public int tabIdMain;
 		public int tabIdLocal;

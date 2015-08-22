@@ -19,7 +19,9 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 import java.util.zip.GZIPInputStream;
@@ -39,6 +41,7 @@ import com.wildex999.schematicbuilder.gui.IGuiWatchers;
 import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
 import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder.GUI;
 import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder;
+import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder.ActionType;
 import com.wildex999.schematicbuilder.network.MessageBase;
 import com.wildex999.schematicbuilder.network.MessageUpdateSchematicBuilder;
 import com.wildex999.schematicbuilder.network.MessageUploadSchematic;
@@ -64,6 +67,7 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryBasic;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityFlowerPot;
 import net.minecraft.world.World;
@@ -103,6 +107,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		}
 	}
 	public Config config = new Config();
+	
+	//Upload to Client
+	public static class UploadJob {
+		byte[] data; //Data to send(Compressed)
+		int offset; //How much has been sent
+	}
+	HashMap<EntityPlayerMP, UploadJob> uploadManager;
 	
 	public String schematicName;
 	@SideOnly(Side.CLIENT)
@@ -155,6 +166,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	private boolean uploadApproved; //Set to true when server allows us to start uploading
 	@SideOnly(Side.CLIENT)
 	private boolean uploadComplete; //Set to true when done sending data(But before server notify us of getting all the data)
+	@SideOnly(Side.CLIENT)
+	public boolean downloadComplete; //Set to true when done downloading Schematic from server
+	
 	private boolean inUpload; //Set to true when Client is uploading/Server is downloading
 	private byte[] uploadData;
 	private int uploadOffset;
@@ -175,6 +189,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		loadedSchematic = null;
 		resources = new HashMap<Short, ResourceItem>();
+		uploadManager = new HashMap<EntityPlayerMP, UploadJob>();
 		cachedSchematicFile = "";
 		direction = 0;
 		lastX = lastY = lastZ = 0;
@@ -228,6 +243,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		else if(state == BuilderState.DOWNLOADING)
 			serverUploadUpdate();
 		
+		//Upload to client
+		serverSendSchematicUpdate();
+		
 		if(++resourceUpdateTimer >= resourceUpdateFreq)
 		{
 			sendNetworkUpdateResources(null);
@@ -242,41 +260,111 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		loadSavedSchematic();
 	}
 	
-	//Get the World equivalent of the Schematic position, this depends on the direction,
-	//and using lastX and lastY.
-	//Direction:
-    //0 = South(Positive Z)
-    //1 = West (Negative X)
-    //2 = North(Negative Z)
-    //3 = East (Positive X)
-	/*private int getWorldX() {
-		switch(direction)
+	//Start sending the current schematic to a player
+	//player: null to send to all watchers
+	public void startSendSchematic(EntityPlayerMP player) {
+		ArrayList<EntityPlayerMP> players = new ArrayList<EntityPlayerMP>();
+		if(player == null)
 		{
-		case 0:
-			return xCoord - lastX;
-		case 1:
-			return xCoord - lastZ;
-		case 2:
-			return xCoord + lastX;
-		case 3:
-			return xCoord + lastZ;
+			for(EntityPlayer pl : watchers)
+				players.add((EntityPlayerMP)pl);
 		}
-		return lastX;
+		else
+			players.add(player);
+		
+		if(players.isEmpty() || loadedSchematic == null)
+			return;
+		
+		//Prepare Schematic data
+		ByteBuf buf = Unpooled.buffer();
+		loadedSchematic.toBytes(buf);
+		
+		//Compress the Schematic data
+		ByteArrayOutputStream byteStream;
+		try {
+			byteStream = new ByteArrayOutputStream();
+			GZIPOutputStream compressedStream = new GZIPOutputStream(byteStream);
+			compressedStream.write(buf.array());
+			compressedStream.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		byte[] sendData = byteStream.toByteArray();
+		
+		for(EntityPlayerMP pl : players)
+		{
+			//Abort existing
+			abortSendSchematic(pl);
+			
+			UploadJob job = new UploadJob();
+			job.data = sendData;
+			job.offset = 0;
+			
+			MessageBase netMessage = new MessageUploadSchematic(this, sendData.length);
+			netMessage.sendToPlayer(pl);
+			uploadManager.put(pl, job);
+		}
 	}
-	private int getWorldZ() {
-		switch(direction)
+	
+	public void serverSendSchematicUpdate() {
+		Iterator<Entry<EntityPlayerMP,UploadJob>> it = uploadManager.entrySet().iterator();
+		while(it.hasNext())
 		{
-		case 0:
-			return zCoord + (lastZ + 1);
-		case 1:
-			return zCoord - (lastX + 1);
-		case 2:
-			return zCoord - (lastZ + 1);
-		case 3:
-			return zCoord + (lastX + 1);
+			Entry<EntityPlayerMP,UploadJob> entry = it.next();
+			EntityPlayerMP player = entry.getKey();
+			UploadJob job = entry.getValue();
+			
+			//Check if player is still online(Handle players who have crashed)
+			List<EntityPlayerMP> players = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
+			if(!players.contains(player))
+				it.remove();
+			
+			int dataLen = MessageUploadSchematic.packetSize;
+			if(job.offset + dataLen > job.data.length)
+				dataLen = job.data.length - job.offset;
+			
+			byte[] data = new byte[dataLen];
+			System.arraycopy(job.data, job.offset, data, 0, dataLen);
+			MessageBase msg = new MessageUploadSchematic(this, data);
+			msg.sendToPlayer(player);
+			
+			job.offset += dataLen;
+			
+			if(job.offset >= job.data.length)
+			{
+				msg = new MessageUploadSchematic(this, false);
+				msg.sendToPlayer(player);
+				it.remove();
+			}
+			
 		}
-		return lastZ;
-	}*/
+	}
+	
+	//Abort currently sending schematic
+	//player: null to send to all watchers
+	public void abortSendSchematic(EntityPlayerMP player) {
+		ArrayList<EntityPlayerMP> players = new ArrayList<EntityPlayerMP>();
+		if(player == null)
+		{
+			for(EntityPlayer pl : watchers)
+				players.add((EntityPlayerMP)pl);
+		}
+		else
+			players.add(player);
+		
+		for(EntityPlayerMP pl : players)
+		{
+			UploadJob job = uploadManager.get(pl);
+			if(job == null)
+				continue;
+			
+			MessageBase netMessage = new MessageUploadSchematic(this, true);
+			netMessage.sendToPlayer(pl);
+			uploadManager.remove(pl);
+		}
+		
+	}
 	
 	//Do the Building on the server
 	public void serverBuildUpdate() {
@@ -549,7 +637,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		if(uploadOffset >= uploadData.length)
 		{
 			uploadComplete = true;
-			msg = new MessageUploadSchematic(this);
+			msg = new MessageUploadSchematic(this, false);
 			msg.sendToServer();
 		}
 	}
@@ -648,7 +736,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	@Override
 	public void removeWatcher(EntityPlayer player) {
 		if(worldObj.isRemote)
+		{
+			downloadComplete = true; //Stop download when no longer in GUI
 			return;
+		}
+		
+		//Stop sending Schematic to player
+		abortSendSchematic((EntityPlayerMP)player);
 		
 		watchers.remove(player);
 	}
@@ -801,6 +895,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 							e.printStackTrace();
 						} 
 					}
+					else
+					{
+						//Request Schematic download
+						//TODO: Config whether this is enabled or not
+						MessageBase netMessage = new MessageActionSchematicBuilder(this, ActionType.DOWNLOAD);
+						netMessage.sendToServer();
+					}
 				}
 			}
 		}
@@ -914,6 +1015,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			System.out.println("Start upload(" + size + " bytes) from player: " + uploader.getDisplayName());
 		}
 		
+		//Stop ant sending of previous Schematic
+		abortSendSchematic(null);
+		
 		//Clear any existing Schematic
 		loadedSchematic = null;
 		cachedSchematicFile = "";
@@ -957,9 +1061,28 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		sendNetworkUpdateMessage(null);
 	}
 	
-	public void networkOnUploadEnd(EntityPlayerMP uploader) {
+	public void networkOnUploadEnd(EntityPlayerMP uploader, boolean abort) {
 		if(!inUpload || this.uploader != uploader)
 			return;
+		
+		//Client aborted
+		if(abort)
+		{
+			state = BuilderState.IDLE;
+			cleanUpload();
+			markDirty();
+			sendNetworkUpdateFull(null);
+		}
+		
+		//Not received enough data
+		if(uploadOffset != uploadData.length)
+		{
+			state = BuilderState.ERROR;
+			message = "Did not receive full Schematic upload. Expected: " + uploadData.length + " bytes, got: " + uploadOffset;
+			cleanUpload();
+			markDirty();
+			sendNetworkUpdateFull(null);
+		}
 		
 		//Read the Schematic
 		try {
@@ -1012,6 +1135,100 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		markDirty();
 		sendNetworkUpdateFull(null);
+	}
+	
+	@SideOnly(Side.CLIENT)
+	public void networkOnDownloadStart(int size) {
+		if(size > maxSchematicBytes || size <= 0)
+			return;
+		
+		downloadComplete = false;
+		uploadOffset = 0;
+		uploadData = new byte[size];
+	}
+	
+	@SideOnly(Side.CLIENT)
+	public void networkOnDownloadData(byte[] data) {
+		if(downloadComplete)
+			return;
+		
+		System.arraycopy(data, 0, uploadData, uploadOffset, data.length);
+		uploadOffset += data.length;
+		
+		if(uploadOffset > uploadData.length)
+		{
+			uploadData = null;
+			downloadComplete = true;
+			return;
+		}
+		
+	}
+	
+	@SideOnly(Side.CLIENT)
+	public void networkOnDownloadEnd(boolean abort) {
+		if(downloadComplete)
+			return;
+		
+		if(abort)
+		{
+			downloadComplete = true;
+			uploadData = null;
+			return;
+		}
+		
+		//Not received enough data
+		if(uploadOffset != uploadData.length)
+		{
+			downloadComplete = true;
+			ModLog.printTileErrorPrefix(this);
+			System.err.println("Failed to download Schematic. Download ended without enough data. Expected: " + uploadData.length + ". Got: " + uploadOffset);
+			uploadData = null;
+			return;
+		}
+		
+		//Read the Schematic
+		try {
+			ByteArrayOutputStream decompressedStream = new ByteArrayOutputStream();
+			IOUtils.copy(new GZIPInputStream(new ByteArrayInputStream(uploadData)), decompressedStream);
+			
+			ByteBuf buf = Unpooled.wrappedBuffer(decompressedStream.toByteArray());
+			HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
+			loadedSchematic = Schematic.fromBytes(buf, blockCount);
+			populateResources(blockCount);
+			
+			//Cache downloaded Schematic
+			File cacheFolder = getCacheFolderClient();
+			File cacheFile = new File(cacheFolder, cachedSchematicFile);
+			try {
+				SchematicLoader.saveSchematic(cacheFile, loadedSchematic);
+			} catch (Exception e) {
+				ModLog.printTileErrorPrefix(this);
+				System.err.println("Failed to save cached Schematic file: " + cachedSchematicFile);
+				e.printStackTrace();
+			}
+			
+		} catch(Exception e) {
+			ModLog.printTileErrorPrefix(this);
+			System.err.println("Error while reading downloaded Schematic");
+			e.printStackTrace();
+		}
+		
+		downloadComplete = true;
+		uploadData = null;
+		
+	}
+	
+	//Returns the percentage of download progress
+	@SideOnly(Side.CLIENT)
+	public String getDownloadProgress() {
+		if(uploadData == null)
+			return "";
+		if(downloadComplete)
+			return "100%";
+		
+		float progress = uploadOffset / (float) uploadData.length;
+		NumberFormat format = new DecimalFormat("0.00");
+		return format.format(progress*100.0) + "%";
 	}
 	
 	public boolean canBuild() {
@@ -1081,6 +1298,12 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		//Inform watchers about config change
 		sendNetworkUpdateFull(null);
+	}
+	
+	//Client request Schematic download
+	public void actionDownload(EntityPlayerMP player) {
+		//TODO: Config whether this is enabled or not
+		startSendSchematic(player);
 	}
 	
 	//Update the internal values used for Building direction depending on the direction value(Metadata)
@@ -1268,6 +1491,18 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			//Number of items already loaded and used are read from Tile NBT
 			resources.put(blockIndex, item);
 		}
+	}
+	
+	@Override
+	public void onChunkUnload() {
+		abortSendSchematic(null);
+		super.onChunkUnload();
+	}
+	
+	@Override
+	public void invalidate() {
+		abortSendSchematic(null);
+		super.invalidate();
 	}
 	
 	@Override

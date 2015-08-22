@@ -23,6 +23,7 @@ public class Networking {
 		channel.registerMessage(MessageActionSchematicBuilder.Handler.class, MessageActionSchematicBuilder.class, getFreeId(), Side.SERVER);
 		
 		channel.registerMessage(MessageUpdateSchematicBuilder.Handler.class, MessageUpdateSchematicBuilder.class, getFreeId(), Side.CLIENT);
+		channel.registerMessage(MessageUploadSchematic.Handler.class, MessageUploadSchematic.class, getFreeId(), Side.CLIENT);
 		
 		//Release 2
 		//Release 3

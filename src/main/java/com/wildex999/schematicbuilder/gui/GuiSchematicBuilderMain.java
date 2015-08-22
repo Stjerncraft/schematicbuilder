@@ -67,6 +67,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	private GuiLabel labelSchematicAuthor;
 	private GuiLabel labelSchematicSize;
 	private GuiLabel labelPassCount;
+	private GuiLabel labelDownloadProgress;
 	
 	private GuiCheckBox checkBoxFloor;
 	private GuiCheckBox checkBoxAir;
@@ -116,6 +117,11 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		labelSchematicName.label = "Schematic: " + gui.tile.schematicName;
 		labelSchematicAuthor.label = "Author: " + gui.tile.schematicAuthor;
 		labelSchematicSize.label = "Size(X | Y | Z): " + gui.tile.schematicWidth + " | " + gui.tile.schematicHeight + " | " + gui.tile.schematicLength;
+		
+		if(gui.tile.loadedSchematic == null && !gui.tile.cachedSchematicFile.isEmpty())
+			labelDownloadProgress.label = gui.tile.getDownloadProgress();
+		else
+			labelDownloadProgress.label = "";
 		
 		buttonPass1.toggled = false;
 		buttonPass2.toggled = false;
@@ -232,6 +238,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		labelSchematicAuthor = new GuiLabel("Author: None", guiLeft + 5, guiTop + 35, gui.colorText);
 		labelSchematicSize = new GuiLabel("Size(X | Y | Z): 0 | 0 | 0", guiLeft + 5, guiTop + 45, gui.colorText);
 		labelPassCount = new GuiLabel("Passes to run:", guiLeft + 110, guiTop + 64, gui.colorText);
+		labelDownloadProgress = new GuiLabel("", guiLeft, guiTop + 100, gui.colorWhite);
 		
 		buttonBuild = new GuiButton(13, guiLeft + 145, guiTop + 170, 80, 20, stringBuild);
 		buttonAutoRender = new GuiButtonStretched(0, guiLeft + 55, guiTop + 64, 45, 10, "Render");
@@ -366,6 +373,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				textList.add(gui.tile.message);
 		}
 		
+		labelDownloadProgress.draw(fontRendererObj); //Draw the download progress in front of Rendering
 		this.drawHoveringText(textList, mouseX-guiLeft, mouseY-guiTop, fontRendererObj);
 	}
 	

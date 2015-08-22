@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import net.minecraft.block.Block;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
@@ -23,7 +24,8 @@ public class MessageActionSchematicBuilder extends MessageBase {
 	public enum ActionType {
 		BUILD(0),
 		STOP(1),
-		CONFIG(2);
+		CONFIG(2),
+		DOWNLOAD(3);
 		
 		private final int value;
 		
@@ -110,6 +112,9 @@ public class MessageActionSchematicBuilder extends MessageBase {
         		break;
         	case CONFIG:
         		tile.actionConfig(message.config);
+        		break;
+        	case DOWNLOAD:
+        		tile.actionDownload(ctx.getServerHandler().playerEntity);
         		break;
         	}
         	
