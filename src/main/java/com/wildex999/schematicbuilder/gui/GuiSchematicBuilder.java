@@ -53,6 +53,7 @@ public class GuiSchematicBuilder implements IGuiHandler
 		
 		public TileSchematicBuilder tile;
 		public EntityPlayer player;
+		public ContainerSchematicBuilder container;
 		public boolean ignoreKeyboardEvent;
 		
 		public int colorText = 4210752;
@@ -96,6 +97,13 @@ public class GuiSchematicBuilder implements IGuiHandler
 				player.closeScreen();
 				return;
 			}
+			if(!(inventorySlots instanceof ContainerSchematicBuilder))
+			{
+				player.closeScreen();
+				return;
+			}
+			container = (ContainerSchematicBuilder)inventorySlots;
+			container.hidePlayerInventory(true);
 			
 			tabIdMain = addTab(new GuiSchematicBuilderMain(this));
 			tabIdLocal = addTab(new GuiSchematicBuilderLoadLocal(this));

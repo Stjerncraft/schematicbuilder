@@ -360,6 +360,11 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		{
 			textList.add("If checked, will place air blocks from Schematic.");
 		}
+		else if(labelStatusContent.isOver(mouseX, mouseY))
+		{
+			if(gui.tile.message != null && gui.tile.state == BuilderState.ERROR)
+				textList.add(gui.tile.message);
+		}
 		
 		this.drawHoveringText(textList, mouseX-guiLeft, mouseY-guiTop, fontRendererObj);
 	}

@@ -23,7 +23,7 @@ import cpw.mods.fml.common.registry.GameRegistry;
 @Mod(modid = ModSchematicBuilder.MODID, version = ModSchematicBuilder.VERSION, dependencies = "after:CoFHAPI")
 public class ModSchematicBuilder {
 	public static final String MODID = "schematicbuilder";
-	public static final String VERSION = "0.2.1";
+	public static final String VERSION = "0.2.2";
 	public static ModSchematicBuilder instance;
 	
 	@SidedProxy(clientSide = "com.wildex999.schematicbuilder.ClientProxy", serverSide = "com.wildex999.schematicbuilder.CommonProxy")

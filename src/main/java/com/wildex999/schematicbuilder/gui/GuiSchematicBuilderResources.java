@@ -117,10 +117,13 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 				resourceList.addEntry(listEntry);
 			}
 		}
+		
+		gui.container.hidePlayerInventory(false);
 	}
 	
 	@Override
 	public void onTabDeactivated() {
+		gui.container.hidePlayerInventory(true);
 		//TODO: Allow it to remain, but detect if new Schematic is loaded
 		resourceList.clear();
 	}
@@ -184,7 +187,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		resourceList.draw(mc);
 		
 		labelContainerName.draw(fontRendererObj);
-		labelStatus.draw(fontRendererObj);
+		//labelStatus.draw(fontRendererObj);
 		labelStatusContent.draw(fontRendererObj);
 		if(ModSchematicBuilder.useEnergy)
 			labelEnergy.draw(fontRendererObj);
