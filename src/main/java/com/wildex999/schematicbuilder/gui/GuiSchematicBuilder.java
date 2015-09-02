@@ -71,7 +71,7 @@ public class GuiSchematicBuilder implements IGuiHandler
 		
 		//Tabs
 		private ArrayList<IGuiTabEntry> tabs = new ArrayList<IGuiTabEntry>();
-		private int currentTab = 0;
+		private int currentTab = -1;
 	
 		
 		/*
@@ -132,7 +132,8 @@ public class GuiSchematicBuilder implements IGuiHandler
 		}
 		
 		public void openTab(int tabId) {
-			tabs.get(currentTab).onTabDeactivated();
+			if(currentTab != -1)
+				tabs.get(currentTab).onTabDeactivated();
 			currentTab = tabId;
 			setWorldAndResolution(mc, width, height);
 			tabs.get(currentTab).onTabActivated();
@@ -143,10 +144,14 @@ public class GuiSchematicBuilder implements IGuiHandler
 		public void setWorldAndResolution(Minecraft mc, int width, int height) {
 			super.setWorldAndResolution(mc, width, height);
 			
+			if(currentTab == -1)
+			{
+				openTab(tabIdMain);
+				return;
+			}
+
 			IGuiTabEntry tab = tabs.get(currentTab);
-			
 			tab.getGui().setWorldAndResolution(mc, width, height);
-			
 			guiLeft = tab.getGuiLeft();
 			guiTop = tab.getGuiTop();
 			width = tab.getGuiWidth() + tabsWidth;

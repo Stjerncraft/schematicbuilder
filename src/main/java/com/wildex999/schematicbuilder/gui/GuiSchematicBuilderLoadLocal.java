@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.lwjgl.input.Mouse;
@@ -125,15 +126,17 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		});
 		
 		//Check for missing files
-		Set<String> fileNames = schematicFiles.keySet();
-		for(String fileName : fileNames)
+		Iterator<Entry<String, GuiListEntry>> it = schematicFiles.entrySet().iterator();
+		while(it.hasNext())
 		{
+			Entry<String, GuiListEntry> entry = it.next();
+			String fileName = entry.getKey();
 			//TODO: Use fileList to check instead to avoid hammering drive
 			if(!new File(loadFolder, fileName).exists())
 			{
-				GuiListEntry entry = schematicFiles.remove(fileName);
-				if(entry != null)
-					schematicList.removeEntry(entry);
+				GuiListEntry listEntry = schematicFiles.remove(fileName);
+				if(listEntry != null)
+					it.remove();
 			}
 		}
 		

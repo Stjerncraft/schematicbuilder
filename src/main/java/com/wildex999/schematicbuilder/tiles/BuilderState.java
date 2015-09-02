@@ -20,7 +20,8 @@ public enum BuilderState {
 	DONE(12), //Done building from Schematic
 	DONEMISSING(13), //Done, but unable to place some blocks
 	ERROR(14), //Same as IDLE, but show an error message
-	STOPPED(15); //Same as BUILDING, but not actively running
+	STOPPED(15), //Same as BUILDING, but not actively running
+	WAITINGFORSERVER(16); //Client: Waiting for current status from server(Default when opening GUI)
 	
 	private final int value;
 	

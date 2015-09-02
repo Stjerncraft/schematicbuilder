@@ -54,6 +54,10 @@ public class SchematicWorldCache implements IBlockAccess {
 		}
 	}
 	
+	public Schematic getSchematic() {
+		return schematic;
+	}
+	
 	private int getIndex(int x, int y, int z) {
 		return (x*schematic.getHeight()*schematic.getLength()) + (y*schematic.getLength()) + z;
 	}

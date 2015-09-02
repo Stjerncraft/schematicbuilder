@@ -26,8 +26,10 @@ import cpw.mods.fml.common.registry.GameRegistry;
 @Mod(modid = ModSchematicBuilder.MODID, version = ModSchematicBuilder.VERSION, dependencies = "after:CoFHAPI")
 public class ModSchematicBuilder {
 	public static final String MODID = "schematicbuilder";
-	public static final String VERSION = "0.2.2";
+	public static final String VERSION = "0.2.3";
 	public static ModSchematicBuilder instance;
+	
+	public static boolean debug = true;
 	
 	@SidedProxy(clientSide = "com.wildex999.schematicbuilder.ClientProxy", serverSide = "com.wildex999.schematicbuilder.CommonProxy")
 	public static CommonProxy proxy;
@@ -61,6 +63,8 @@ public class ModSchematicBuilder {
     		System.out.println("CoFHAPI not found, Blocks will not require energy.");
     		useEnergy = false;
     	}
+    	//TODO: FOR TESTING
+    	useEnergy = false;
     	
     	//Init GUI
     	guiHandler = new GuiHandler();

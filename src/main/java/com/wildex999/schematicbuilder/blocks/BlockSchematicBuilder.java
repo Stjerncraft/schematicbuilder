@@ -83,13 +83,15 @@ public class BlockSchematicBuilder extends BlockBase {
         	String cachedFile = nbt.getString("cachedSchematicFile");
         	String schematicName = nbt.getString("schematicName");
         	
-        	if(!cachedFile.trim().isEmpty())
-        		tileBuilder.onPlaceCached(cachedFile, schematicName);
+        	tileBuilder.config.readFromNBT(nbt, tileBuilder);
         	
         	if(ModSchematicBuilder.useEnergy)
         	{
         		tileBuilder.energyStorage.setEnergyStored(nbt.getInteger("energy"));
         	}
+        	
+        	if(!cachedFile.trim().isEmpty())
+        		tileBuilder.onPlaceCached(cachedFile, schematicName);
         }
 	}
 	
@@ -130,15 +132,21 @@ public class BlockSchematicBuilder extends BlockBase {
 			dropItem.setTagCompound(new NBTTagCompound());
 		NBTTagCompound nbt = dropItem.getTagCompound();
 		
+		//Write data
 		nbt.setString("cachedSchematicFile", tileBuilder.cachedSchematicFile);
 		if(tileBuilder.loadedSchematic == null)
 			nbt.setString("schematicName", "None");
 		else
 			nbt.setString("schematicName", tileBuilder.loadedSchematic.name);
+		
+		tileBuilder.config.writeToNBT(nbt);
+		
 		if(ModSchematicBuilder.useEnergy)
 		{
 			nbt.setInteger("energy", tileBuilder.energyStorage.getEnergyStored());
 		}
+		
+		//TODO: Drop Resources as SuperCompressedItem, which can be placed in crafting table to retrieve stacks of the compressed item.
 		
 		return dropItems;
     }

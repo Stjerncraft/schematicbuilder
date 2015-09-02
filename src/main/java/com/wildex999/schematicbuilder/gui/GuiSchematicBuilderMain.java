@@ -1,10 +1,13 @@
 package com.wildex999.schematicbuilder.gui;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Comparator;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.Project;
 
+import scala.actors.threadpool.Arrays;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
@@ -16,11 +19,13 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.RenderList;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.settings.GameSettings;
+import net.minecraft.client.shader.TesselatorVertexState;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
@@ -41,6 +46,7 @@ import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder.Acti
 import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
 import com.wildex999.schematicbuilder.tiles.BuilderState;
+import com.wildex999.utils.ModLog;
 
 import cpw.mods.fml.client.config.GuiCheckBox;
 import cpw.mods.fml.client.config.GuiSlider;
@@ -60,6 +66,30 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	private int renderWidth, renderHeight;
 	private long prevFrameTime = 0;
 	
+	private class RenderCache {
+		public int chunkX;
+		public int chunkY;
+		public int chunkZ;
+		public int renderListIndex;
+		
+		public RenderCache(int chunkX, int chunkY, int chunkZ, int renderListIndex) {
+			this.chunkX = chunkX;
+			this.chunkY = chunkY;
+			this.chunkZ = chunkZ;
+			this.renderListIndex = renderListIndex;
+		}
+	}
+	private ArrayList<RenderCache> renderChunks;
+	private Schematic cachedRenderSchematic;
+	private int chunkSize = 16;
+	float viewZ; //Camera position
+	float viewX;
+	
+	private RenderList renderList;
+	private int renderListStart;
+	private int renderListCurrent;
+	private int renderListSize;
+	
 	private GuiLabel labelContainerName;
 	private GuiLabel labelStatus;
 	private GuiLabel labelStatusContent;
@@ -67,7 +97,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	private GuiLabel labelSchematicAuthor;
 	private GuiLabel labelSchematicSize;
 	private GuiLabel labelPassCount;
-	private GuiLabel labelDownloadProgress;
+	private GuiLabel labelLoadProgress;
 	
 	private GuiCheckBox checkBoxFloor;
 	private GuiCheckBox checkBoxAir;
@@ -93,17 +123,18 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	
 	public GuiSchematicBuilderMain(GuiSchematicBuilder.GUI gui) {
 		this.gui = gui;
+		renderChunks = new ArrayList<RenderCache>();
 	}
 	
 	
 	@Override
 	public void onTabActivated() {
+		renderChunks.clear();
 	}
 	
 	@Override
 	public void onTabDeactivated() {
-		// TODO Auto-generated method stub
-		
+		clearRenderCache();
 	}
 	
 	@Override
@@ -119,9 +150,9 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		labelSchematicSize.label = "Size(X | Y | Z): " + gui.tile.schematicWidth + " | " + gui.tile.schematicHeight + " | " + gui.tile.schematicLength;
 		
 		if(gui.tile.loadedSchematic == null && !gui.tile.cachedSchematicFile.isEmpty())
-			labelDownloadProgress.label = gui.tile.getDownloadProgress();
+			labelLoadProgress.label = gui.tile.getDownloadProgress();
 		else
-			labelDownloadProgress.label = "";
+			labelLoadProgress.label = "";
 		
 		buttonPass1.toggled = false;
 		buttonPass2.toggled = false;
@@ -214,6 +245,14 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 			buttonBuild.displayString = stringStop;
 			buttonBuild.enabled = true;
 			break;
+		case PREPARING:
+			labelStatusContent.label = "Preparing: " + gui.tile.message;
+			labelStatusContent.color = gui.colorOk;
+			break;
+		case WAITINGFORSERVER:
+			labelStatusContent.label = "Waiting for Server...";
+			labelStatusContent.color = gui.colorError;
+			break;
 		default:
 			labelStatusContent.label = "Unknown State: " + state + "(" + gui.tile.message + ")";
 			labelStatusContent.color = gui.colorError;
@@ -238,7 +277,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		labelSchematicAuthor = new GuiLabel("Author: None", guiLeft + 5, guiTop + 35, gui.colorText);
 		labelSchematicSize = new GuiLabel("Size(X | Y | Z): 0 | 0 | 0", guiLeft + 5, guiTop + 45, gui.colorText);
 		labelPassCount = new GuiLabel("Passes to run:", guiLeft + 110, guiTop + 64, gui.colorText);
-		labelDownloadProgress = new GuiLabel("", guiLeft, guiTop + 100, gui.colorWhite);
+		labelLoadProgress = new GuiLabel("", guiLeft + 146, guiTop + 110, gui.colorText);
 		
 		buttonBuild = new GuiButton(13, guiLeft + 145, guiTop + 170, 80, 20, stringBuild);
 		buttonAutoRender = new GuiButtonStretched(0, guiLeft + 55, guiTop + 64, 45, 10, "Render");
@@ -297,6 +336,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		labelSchematicAuthor.draw(fontRendererObj);
 		labelSchematicSize.draw(fontRendererObj);
 		labelPassCount.draw(fontRendererObj);
+		labelLoadProgress.draw(fontRendererObj);
 		
 		//Draw Rendering background
 		this.drawRect(renderPosX, renderPosY, renderPosX+renderWidth, renderPosY+renderHeight, 0xFF000000);
@@ -307,33 +347,29 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	
 	@Override
 	public void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-		/*ItemStack itemStack = new ItemStack(Blocks.redstone_wire);
-		if(itemStack == null)
-		{
-			System.out.println("No itemstack to render");
-			
-		}*/
-		//RenderItem.getInstance().renderItemIntoGUI(fontRendererObj, mc.getTextureManager(), itemStack, 10, 10);
-		
-		//IDEA: Drop block we want to render + all edges(6 blocks) and then ask it to render at a custom location(Let's say we start from 0,64,0)
-		//And try to ask it to ignore lighting.
-		//But first, try only rendering the one block without calling update and enforcing metadata.
-		
-
-		
 		TextureManager texMan = mc.getTextureManager();
 		boolean renderWithColor = true;
 		
 		Schematic schematic = gui.tile.loadedSchematic;
-		if(schematic != null && renderSchematic)
-		{
-			if(gui.tile.schematicCache == null)
-				gui.tile.schematicCache = new SchematicWorldCache(schematic);
-			RenderBlocks renderBlocksRi = new RenderBlocks(gui.tile.schematicCache);
-			renderBlocksRi.enableAO = false;
-			renderBlocks(texMan, renderBlocksRi, schematic);
-			//gui.tile.getWorldObj().setBlock(gui.tile.xCoord, gui.tile.yCoord, gui.tile.zCoord, BlockLibrary.schematicBuilder);
-			//gui.tile.getWorldObj().setTileEntity(gui.tile.xCoord, gui.tile.yCoord, gui.tile.zCoord, gui.tile);
+		try {
+			if(schematic != null && renderSchematic)
+			{
+				if(gui.tile.schematicCache == null)
+					gui.tile.schematicCache = new SchematicWorldCache(schematic);
+				RenderBlocks renderBlocksRi = new RenderBlocks(gui.tile.schematicCache);
+				renderBlocksRi.enableAO = false;
+				renderBlocks(texMan, renderBlocksRi, schematic);
+			}
+		} catch(Exception e) {
+			ModLog.printTileErrorPrefix(gui.tile);
+			ModLog.logger.error("Error while rendering Schematic preview. Disabling preview: " + e.getMessage());
+			e.printStackTrace();
+			renderSchematic = false;
+			
+			//Tessellator might be drawing
+			try {
+				Tessellator.instance.draw();
+			} catch(Exception et) {}
 		}
 		
 		//Draw tooltips
@@ -373,7 +409,6 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				textList.add(gui.tile.message);
 		}
 		
-		labelDownloadProgress.draw(fontRendererObj); //Draw the download progress in front of Rendering
 		this.drawHoveringText(textList, mouseX-guiLeft, mouseY-guiTop, fontRendererObj);
 	}
 	
@@ -386,7 +421,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
         ScaledResolution sr = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
         
 		//Camera(Project)
-        float farPlaneDistance = (float)(this.mc.gameSettings.renderDistanceChunks * 16);
+        float farPlaneDistance = (float)((this.mc.gameSettings.renderDistanceChunks + 10) * 16 );
         GL11.glMatrixMode(GL11.GL_PROJECTION);
         GL11.glPushMatrix();
         GL11.glLoadIdentity();
@@ -402,48 +437,29 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
         GL11.glTranslatef(0, 0, -4f);
 		
 		texMan.bindTexture(TextureMap.locationBlocksTexture);
-        //GL11.glEnable(GL11.GL_ALPHA_TEST);
 
-        zl -= 2f;
-        //GL11.glTranslatef((float)(posX - 2), (float)(posY + 3), -3.0F + this.zLevel + zl);
-        /*GL11.glScalef(10.0F, 10.0F, 10.0F);
-        GL11.glTranslatef(1.0F, 0.5F, 1.0F);
-        GL11.glScalef(1.0F, 1.0F, -1.0F);
-        GL11.glRotatef(210.0F, 1.0F, 0.0F, 0.0F);
-        GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);*/
-        //l = itemStack.getItem().getColorFromItemStack(itemStack, 0);
-        l = 16777215;
-        f3 = (float)(l >> 16 & 255) / 255.0F;
-        f4 = (float)(l >> 8 & 255) / 255.0F;
-        f = (float)(l & 255) / 255.0F;
-
-        if (true) //renderWithColor
-        {
-            GL11.glColor4f(f3, f4, f, 1.0F);
-        }
-
-        //rot+= 0.5f;
-        //GL11.glRotatef(rot, 0.0F, 1.0F, 0.0F);
-        //GL11.glDisable(GL11.GL_DEPTH_TEST);
         GL11.glEnable(GL11.GL_CULL_FACE);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearDepth(1.0f);
         GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
-        //GL11.glFrontFace(GL11.GL_CW);
+
         renderBlocksRi.useInventoryTint = true; //renderWithColor
-        Tessellator.instance.startDrawingQuads();
         
-        //System.out.println("Rendersize: " + schematic.getWidth() + " " + schematic.getHeight() + " " + schematic.getLength());
-        //System.out.println("RenderAllSides: " + renderBlocksRi.renderAllFaces);
 		int ambientOcclusion = Minecraft.getMinecraft().gameSettings.ambientOcclusion;
 		Minecraft.getMinecraft().gameSettings.ambientOcclusion = 0; //Don't do light level checks
         
-        //TODO: Split into chunks and do per chunk frustrum and distance check
-		//TODO: Render to texture and only re-render when rotating
-		//TODO: Render one chunk per draw call(Or less?)
+		//Prepare cache
+		int renderChunkRadius = this.mc.gameSettings.renderDistanceChunks * 2;
+		int chunkCountX = (int) Math.ceil((double)schematic.getWidth()/chunkSize);
+		int chunkCountY = (int) Math.ceil((double)schematic.getHeight()/chunkSize);
+		int chunkCountZ = (int) Math.ceil((double)schematic.getLength()/chunkSize);
 		
-
-		Tessellator.instance.setTranslation(-schematic.getWidth()/2, -schematic.getHeight()/2, -schematic.getLength()/2);
+		if(cachedRenderSchematic != schematic)
+		{
+			newRenderCache(chunkCountX*chunkCountY*chunkCountZ);
+			cachedRenderSchematic = schematic;
+		}
+		
 		int maxSize = 0;
 		if(schematic.getWidth() > maxSize)
 			maxSize = schematic.getWidth();
@@ -452,11 +468,200 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		if(schematic.getLength() > maxSize)
 			maxSize = schematic.getLength();
 		
-		for(int x = 0; x < schematic.getWidth(); x++)
+		//Prepare render
+        Minecraft.getMinecraft().gameSettings.ambientOcclusion = ambientOcclusion;
+        float zDistance = schematic.getLength();
+        GL11.glTranslatef(0, 0, -zDistance);
+        
+        long renderTime = System.currentTimeMillis() - prevFrameTime;
+        if(rotateSchematic)
+        	rot += 10f*(renderTime/1000f);
+        GL11.glRotatef(rot, 0, 1, 0);
+        
+        float renderScaleMax = (float) (zDistance * Math.sin(fovy*Math.PI/180f / 2f));
+        float scale = renderScaleMax / (float)(maxSize/2f);
+        scale *= scaleSchematic;
+        GL11.glScalef(scale, scale, scale);
+        
+		GL11.glViewport(renderPosX*sr.getScaleFactor(), mc.displayHeight-((renderPosY*sr.getScaleFactor()) + renderHeight*sr.getScaleFactor()), renderWidth*sr.getScaleFactor(), renderHeight*sr.getScaleFactor());
+		
+		Tessellator.instance.setTranslation(-schematic.getWidth()/2, -schematic.getHeight()/2, -schematic.getLength()/2);
+		
+		//Set viewpoint for distance check
+		viewZ = 0;
+		viewX = zDistance - ((1f/5f)*scaleSchematic*zDistance);
+		
+		float angle = (float) Math.toRadians(270 -rot);
+		viewX = (float) (viewX * Math.cos(angle) - viewZ * Math.sin(angle));
+		viewZ = (float) (viewX * Math.sin(angle) - viewZ * Math.cos(angle));
+	
+		//Make private field public to check if chunk has nothing rendered	
+		Field bufferSizeField;
+		try {
+			bufferSizeField = Tessellator.class.getDeclaredField("rawBufferIndex");
+		}
+		catch (Exception e) {
+			return ;
+		}
+		bufferSizeField.setAccessible(true);
+		
+		//Render in 16x16x16 chunks to cache
+		if(renderChunks.size() < chunkCountX*chunkCountY*chunkCountZ) //First time render
 		{
-			for(int y = 0; y < schematic.getHeight(); y++)
+			int updateChunksPerFrame = 5; //How many chunks to render into cache this frame
+			int chunksUpdated = 0; 
+			boolean stopRender = false;
+			
+			int skipCount = renderChunks.size();
+			
+			for(int chunkX = 0; chunkX < chunkCountX && !stopRender; chunkX++)
 			{
-				for(int z = 0; z < schematic.getLength(); z++)
+				for(int chunkY = 0; chunkY < chunkCountY && !stopRender; chunkY++)
+				{
+					for(int chunkZ = 0; chunkZ < chunkCountZ && !stopRender; chunkZ++)
+					{
+						if(skipCount-- > 0)
+							continue;
+						
+						//Render List
+						int listIndex = renderListCurrent++;
+						if(listIndex >= renderListStart+renderListSize)
+						{
+							System.err.println("Error creating new OpenGL Render list. Not enough indexes!");
+							renderSchematic = false;
+							clearRenderCache();
+							return;
+						}
+						
+						//Store into GL call list
+						GL11.glNewList(listIndex, GL11.GL_COMPILE);
+						
+						//Render Chunk
+						Tessellator.instance.startDrawingQuads();
+						renderChunk(chunkX, chunkY, chunkZ, chunkSize, renderBlocksRi);
+						
+						try {
+							if(bufferSizeField.getInt(Tessellator.instance) > 0)
+							{
+								chunksUpdated++;
+								renderChunks.add(new RenderCache(chunkX, chunkY, chunkZ, listIndex));
+							}
+							else
+								renderChunks.add(null);
+						} catch(Exception e) {}
+						Tessellator.instance.draw(); //Render and reset state
+						
+						GL11.glEndList();
+						
+						if(chunksUpdated >= updateChunksPerFrame)
+							stopRender = true;
+					}
+				}
+			}
+		}
+		
+		//Sort cached renderChunks
+		RenderCache[] sortedCache = new RenderCache[renderChunks.size()];
+		for(int i=0; i<renderChunks.size(); i++)
+			sortedCache[i] = renderChunks.get(i);
+		
+		//Sort by distance to player
+		Arrays.sort(sortedCache, new Comparator<RenderCache>() {
+			@Override
+			public int compare(RenderCache c1, RenderCache c2) {
+				if(c1 == null && c2 == null)
+					return 0;
+				else if(c1 == null)
+					return -1;
+				else if(c2 == null)
+					return 1;
+				
+				int halfChunk = chunkSize/2;
+				int halfWidth = cachedRenderSchematic.getWidth()/2;
+				int halfLength = cachedRenderSchematic.getLength()/2;
+				
+				int chunkPosX = (int) (halfWidth + (chunkSize*c1.chunkX)+halfChunk);
+				int chunkPosZ = (int) (halfLength + (chunkSize*c1.chunkZ)+halfChunk);
+				int distance1 = (int) Math.hypot(viewX-chunkPosX, viewZ-chunkPosZ);
+				
+				chunkPosX = (int) (halfWidth + (chunkSize*c2.chunkX)+halfChunk);
+				chunkPosZ = (int) (halfLength + (chunkSize*c2.chunkZ)+halfChunk);
+				int distance2 = (int) Math.hypot(viewX-chunkPosX, viewZ-chunkPosZ);
+				
+				return Integer.compare(distance1, distance2);
+			}
+		});
+		
+		//Render cached chunks
+		renderList.resetList();
+		renderList.setupRenderList(0, 0, 0, 0, 0, 0);
+		for(RenderCache cache : sortedCache)
+		{
+			if(cache == null)
+				continue;
+			
+			//Check if chunks should render
+			float chunkPosX = (-(float)schematic.getWidth()/2) + ((chunkSize*cache.chunkX)+(chunkSize/2));
+			float chunkPosZ = (-(float)schematic.getLength()/2) + ((chunkSize*cache.chunkZ)+(chunkSize/2));
+			float distance = (float) Math.hypot(viewX-chunkPosX, viewZ-chunkPosZ);
+			if(distance <= renderChunkRadius*chunkSize)
+				renderList.addGLRenderList(cache.renderListIndex);
+		}
+		
+		renderList.callLists();
+
+        Tessellator.instance.setTranslation(0, 0, 0);
+        GL11.glViewport(0,  0, mc.displayWidth, mc.displayHeight);
+        
+        GL11.glScalef(1f/scale, 1f/scale, 1f/scale);
+        
+        //Restore previous values
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glPopMatrix();
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+        GL11.glPopMatrix();
+        
+        prevFrameTime = System.currentTimeMillis();
+	}
+	
+	private void newRenderCache(int size) {
+		if(renderChunks.size() > 0)
+			clearRenderCache();
+		renderList = new RenderList();
+		renderListStart = GL11.glGenLists(size);
+		renderListCurrent = renderListStart;
+		
+		if(renderListStart == 0)
+		{
+			System.err.println("Unable to create OpenGL render list.");
+			renderListSize = 0;
+			renderSchematic = false;
+		}
+		else
+			renderListSize = size;
+	}
+	
+	private void clearRenderCache() {
+		renderChunks.clear();
+		renderList = null;
+		cachedRenderSchematic = null;
+		if(renderListSize > 0)
+		{
+			GL11.glDeleteLists(renderListStart, renderListSize);
+			renderListStart = -1;
+			renderListCurrent = -1;
+			renderListSize = 0;
+		}
+	}
+	
+	protected void renderChunk(int chunkX, int chunkY, int chunkZ, int chunkSize, RenderBlocks renderBlocksRi) {
+		Schematic schematic = gui.tile.loadedSchematic;
+		
+		for(int x = chunkX*chunkSize; x < schematic.getWidth() && x < (chunkX+1) * chunkSize; x++)
+		{
+			for(int y = chunkY*chunkSize; y < schematic.getHeight() && y < (chunkY+1) * chunkSize; y++)
+			{
+				for(int z = chunkZ*chunkSize; z < schematic.getLength() && z < (chunkZ+1) * chunkSize; z++)
 				{
 					SchematicBlock block = schematic.getBlock(x, y, z);
 					if(block == null)
@@ -465,44 +670,10 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 					if(realBlock.getMaterial() == Material.air)
 						continue;
 					
-					//gui.tile.getWorldObj().setBlock(worldX, worldY, worldZ, realBlock, block.metaData, 4); //Set new block without notify and without re-render
 					renderBlocksRi.renderBlockByRenderType(realBlock, x, y, z);
 				}
 			}
 		}
-        
-        Minecraft.getMinecraft().gameSettings.ambientOcclusion = ambientOcclusion;
-        
-        //GL11.glTranslatef(-(gui.tile.xCoord+schematic.getWidth()/2), -(gui.tile.yCoord+schematic.getHeight()/2), -(gui.tile.zCoord+(schematic.getLength()*2)));
-        renderBlocksRi.useInventoryTint = true;
-        
-        GL11.glTranslatef(0, 0, -schematic.getLength()/2f);
-        
-        long renderTime = System.currentTimeMillis() - prevFrameTime;
-        if(rotateSchematic)
-        	rot += 10f*(renderTime/1000f);
-        GL11.glRotatef(rot, 0, 1, 0);
-        
-        float zDistance = schematic.getLength()/2f;
-        
-        float renderScaleMax = (float) (zDistance * Math.sin(fovy*Math.PI/180f / 2f));
-        float scale = renderScaleMax / (float)(maxSize/2f);
-        scale *= scaleSchematic;
-        GL11.glScalef(scale, scale, scale);
-        
-		GL11.glViewport(renderPosX*sr.getScaleFactor(), mc.displayHeight-((renderPosY*sr.getScaleFactor()) + renderHeight*sr.getScaleFactor()), renderWidth*sr.getScaleFactor(), renderHeight*sr.getScaleFactor());
-        Tessellator.instance.draw();
-        Tessellator.instance.setTranslation(0, 0, 0);
-        GL11.glViewport(0,  0, mc.displayWidth, mc.displayHeight);
-        
-        GL11.glScalef(1f/scale, 1f/scale, 1f/scale);
-        //Restore previous values
-        GL11.glMatrixMode(GL11.GL_PROJECTION);
-        GL11.glPopMatrix();
-        GL11.glMatrixMode(GL11.GL_MODELVIEW);
-        GL11.glPopMatrix();
-        
-        prevFrameTime = System.currentTimeMillis();
 	}
 	
 	@Override

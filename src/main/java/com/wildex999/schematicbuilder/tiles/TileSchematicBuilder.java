@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -105,6 +106,37 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			floorBlock = new SchematicBlock(floorBlockTemp, floorBlockMeta);
 			placeAir = buf.readBoolean();
 		}
+		
+	    public void writeToNBT(NBTTagCompound nbt)
+	    {
+			nbt.setInteger("passCount", passCount);
+			nbt.setBoolean("placeFloor", placeFloor);
+			if(floorBlock != null)
+				nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(floorBlock.getBlock()));
+			nbt.setByte("floorBlockMeta", floorBlock.metaData);
+			nbt.setBoolean("placeAir", placeAir);
+	    }
+	    
+	    public void readFromNBT(NBTTagCompound nbt, TileSchematicBuilder tile)
+	    {
+			passCount = nbt.getInteger("passCount");
+			placeFloor = nbt.getBoolean("placeFloor");
+			String floorBlockName = nbt.getString("floorBlock");
+			int floorBlockId = tile.blockRegistry.getId(floorBlockName);
+			if(floorBlockId != -1)
+			{
+				Block floorBlockTemp = tile.blockRegistry.getObjectById(floorBlockId);
+				byte floorBlockMeta = nbt.getByte("floorBlockMeta");
+				floorBlock = new SchematicBlock(floorBlockTemp, floorBlockMeta);
+			}
+			else
+			{
+				ModLog.logger.warn("Unable to get Block id for floor Block: " + floorBlock);
+				//TODO: Mark warning on the floor to inform player of error
+				floorBlock = null;
+			}
+			placeAir = nbt.getBoolean("placeAir");
+	    }
 	}
 	public Config config = new Config();
 	
@@ -176,7 +208,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	public TileSchematicBuilder() {
 		inventory = new InventoryBasic(inventoryName, true, 1);
-		state = BuilderState.IDLE;
+		state = BuilderState.WAITINGFORSERVER;
 		schematicName = "None";
 		message = "";
 		
@@ -223,9 +255,14 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	@Override
 	public void updateEntity() {	
 		if(!initialized) {
+			if(!worldObj.isRemote && state == BuilderState.WAITINGFORSERVER)
+				state = BuilderState.IDLE;
+			
 			direction = worldObj.getBlockMetadata(xCoord, yCoord, zCoord);
 			buildX = xCoord;
 			buildY = yCoord;
+			if(config.placeFloor && currentPass >= 0)
+				buildY++; //Take into account that floor has already been placed
 			buildZ = zCoord;
 			if(loadedSchematic != null)
 				updateDirection();
@@ -254,6 +291,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	}
 	
 	public void onPlaceCached(String cachedFile, String schematicName) {
+		if(worldObj.isRemote)
+			return;
+			
 		this.schematicName = schematicName;
 		this.cachedSchematicFile = cachedFile;
 		
@@ -502,7 +542,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			{
 				lastZ = 0;
 				lastY++;
-				if(config.placeFloor)
+				if(config.placeFloor && currentPass == -1)
 				{
 					//Start from correct Schematic position
 					currentPass = 0;
@@ -599,6 +639,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	@SideOnly(Side.CLIENT)
 	public void clientUpdate() {
+		if(schematicCache != null && schematicCache.getSchematic() != loadedSchematic)
+			schematicCache = null;
+		
 		if(state == BuilderState.CHOOSINGLOCAL)
 			updateSchematicChoosing();
 		
@@ -1015,11 +1058,26 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			System.out.println("Start upload(" + size + " bytes) from player: " + uploader.getDisplayName());
 		}
 		
-		//Stop ant sending of previous Schematic
+		//Stop sending of previous Schematic
 		abortSendSchematic(null);
 		
 		//Clear any existing Schematic
 		loadedSchematic = null;
+		
+		//Cleanup old cached schematic
+		if(!cachedSchematicFile.isEmpty())
+		{
+			File saveFolder = getSaveFolderServer();
+			File cachedFile = new File(saveFolder, cachedSchematicFile);
+			if(cachedFile.exists())
+			{
+				try {
+					Files.delete(cachedFile.toPath());
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 		cachedSchematicFile = "";
 		
 		//Set upload/downlaod state
@@ -1091,27 +1149,23 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			markDirty();
 			sendNetworkUpdateFull(null);
 			
+			long timeStart = System.nanoTime();
 			ByteArrayOutputStream decompressedStream = new ByteArrayOutputStream();
 			
 			IOUtils.copy(new GZIPInputStream(new ByteArrayInputStream(uploadData)), decompressedStream);
-
-			
 			ByteBuf buf = Unpooled.wrappedBuffer(decompressedStream.toByteArray());
+			if(debug)
+			{
+				long timeEnd = System.nanoTime();
+				System.out.println("Time spent decompressing uploaded Schematic: " + TimeUnit.MILLISECONDS.convert(timeEnd-timeStart, TimeUnit.NANOSECONDS) + " ms");
+			}
+			
 			HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
 			loadedSchematic = Schematic.fromBytes(buf, blockCount);
 			populateResources(blockCount);
 			schematicName = loadedSchematic.name;
 			
 			cleanUpload();
-			
-			//Cleanup old cached schematic
-			if(!cachedSchematicFile.isEmpty())
-			{
-				File saveFolder = getSaveFolderServer();
-				File cachedFile = new File(saveFolder, cachedSchematicFile);
-				if(cachedFile.exists())
-					Files.delete(cachedFile.toPath());
-			}
 			
 			//Cache uploaded schematic
 			if(!saveLoadedSchematic())
@@ -1279,7 +1333,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		}
 		if(this.config.placeFloor != config.placeFloor)
 		{
-			if(state != BuilderState.BUILDING && state != BuilderState.STOPPED)
+			if(state != BuilderState.BUILDING && state != BuilderState.STOPPED && state != BuilderState.PREPARING)
 			{
 				this.config.placeFloor = config.placeFloor;
 			}
@@ -1440,21 +1494,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		markDirty();
 		sendNetworkUpdateFull(null);
 		
-		/*try {
-			byte[] data = Files.readAllBytes(schematicFile.toPath());
-			ByteBuf readBuffer = Unpooled.wrappedBuffer(data);
-			loadedSchematic = Schematic.fromBytes(readBuffer);
-			schematicName = loadedSchematic.name;
-			
-			state = BuilderState.READY;
-			
-			markDirty();
-			sendNetworkUpdateFull(null);
-		} catch (Exception e) {
-			System.err.println("Failed to read Cached Schematic from file: " + schematicFile.getAbsolutePath());
-			System.err.println(e.getMessage());
-		}*/
-		
 		return true;
 	}
 	
@@ -1538,23 +1577,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		message = nbt.getString("message");
 		
 		//Config
-		config.passCount = nbt.getInteger("passCount");
-		config.placeFloor = nbt.getBoolean("placeFloor");
-		String floorBlock = nbt.getString("floorBlock");
-		int floorBlockId = blockRegistry.getId(floorBlock);
-		if(floorBlockId != -1)
-		{
-			Block floorBlockTemp = blockRegistry.getObjectById(floorBlockId);
-			byte floorBlockMeta = nbt.getByte("floorBlockMeta");
-			config.floorBlock = new SchematicBlock(floorBlockTemp, floorBlockMeta);
-		}
-		else
-		{
-			ModLog.logger.warn("Unable to get Block id for floor Block: " + floorBlock);
-			//TODO: Mark warning on the floor to inform player of error
-			config.floorBlock = null;
-		}
-		config.placeAir = nbt.getBoolean("placeAir");
+		config.readFromNBT(nbt, this);
 		
 		//Continue Building
 		if(prevState == BuilderState.BUILDING)
@@ -1594,13 +1617,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		nbt.setInteger("currentPass", currentPass);
 		nbt.setString("message", message);
 		
-		//Config
-		nbt.setInteger("passCount", config.passCount);
-		nbt.setBoolean("placeFloor", config.placeFloor);
-		if(config.floorBlock != null)
-			nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(config.floorBlock.getBlock()));
-		nbt.setByte("floorBlockMeta", config.floorBlock.metaData);
-		nbt.setBoolean("placeAir", config.placeAir);
+		config.writeToNBT(nbt);
 		
 		//TODO: Write resource list with resource name, resource needed and resources remaining
 
