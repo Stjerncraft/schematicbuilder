@@ -152,6 +152,14 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	HashMap<EntityPlayerMP, UploadJob> uploadManager;
 	HashSet<EntityPlayerMP> progressManager;
 	
+	//Unloaded state
+	public BuilderState unloadedState; //The state before unloading
+	public int unloadTimeout = 200; //Ticks without activity before unload
+	public int unloadCounter; //Ticks since activity
+	
+	//Preparing
+	public BuilderState preparingState; //The state to go into once done loading Schematic
+	
 	public String schematicName;
 	@SideOnly(Side.CLIENT)
 	public String schematicAuthor;
@@ -230,6 +238,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		loadedSchematic = null;
 		loadSchematicWork = null;
+		unloadCounter = 0;
 		resources = new HashMap<Short, ResourceItem>();
 		uploadManager = new HashMap<EntityPlayerMP, UploadJob>();
 		progressManager = new HashSet<EntityPlayerMP>();
@@ -290,7 +299,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			serverBuildUpdate();
 		else if(state == BuilderState.DOWNLOADING)
 			serverUploadUpdate();
-		else if(state == BuilderState.PREPARING)
+		else if(state == BuilderState.PREPARING || state == BuilderState.RELOADING)
 			serverLoadingUpdate();
 		
 		//Upload to client
@@ -301,8 +310,20 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			sendNetworkUpdateResources(null);
 			resourceUpdateTimer = 0;
 		}
+		//Unload check
+		/*if(canUnload() && unloadCounter++ >= unloadTimeout)
+		{
+			serverUnload();
+		}*/
 	}
 	
+	//Unload the loaded Schematic and save the current state
+	private void serverUnload() {
+		unloadedState = state;
+		state = BuilderState.UNLOADED;
+		loadedSchematic = null;
+	}
+
 	//Server is loading Schematic either from Serialized upload or from file
 	private void serverLoadingUpdate() {
 		if(loadSchematicWork == null)
@@ -331,10 +352,11 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			e.printStackTrace();
 			
 			uploader = null;
-			cachedSchematicFile = null;
+			cachedSchematicFile = "";
 			sendNetworkUpdateFull(null);
 			return;
 		}
+		loadSchematicWork = null;
 		
 		if(result.schematic == null)
 		{
@@ -345,19 +367,39 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		}
 
 		loadedSchematic = result.schematic;
-		populateResources(result.blockCount);
-		schematicName = loadedSchematic.name;
-		
-		//Cache uploaded schematic
-		if(!saveLoadedSchematic())
-			cachedSchematicFile = "";
+		if(state == BuilderState.RELOADING)
+		{ //Reloading from unloaded state
+			state = unloadedState;
+		}
+		else if(preparingState != BuilderState.IDLE)
+		{ //Reloading from saved state
+			state = preparingState;
+			
+			//Continue Building
+			if(state == BuilderState.BUILDING)
+			{
+				//TODO: Config option to force them into STOPPED state until player manually starts it again
+				state = BuilderState.STOPPED;
+				actionBuild();
+			}
+		}
 		else
-			System.out.println("Server cached name: " + cachedSchematicFile);
+		{
+			populateResources(result.blockCount);
+			
+			//Cache uploaded schematic
+			if(!saveLoadedSchematic())
+				cachedSchematicFile = "";
+			else
+				System.out.println("Server cached name: " + cachedSchematicFile);
+			
+			state = BuilderState.READY;
+		}
+			
 		
+		schematicName = loadedSchematic.name;
 		message = "";
-		
 		uploader = null;
-		state = BuilderState.READY;
 		
 		markDirty();
 		sendNetworkUpdateFull(null);
@@ -1115,13 +1157,18 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	@SideOnly(Side.CLIENT)
 	public boolean canAcceptLoad() {
-		return state == BuilderState.IDLE || state == BuilderState.ERROR || state == BuilderState.READY
-				|| state == BuilderState.DONE || state == BuilderState.DONEMISSING || state == BuilderState.STOPPED;
+		return canAcceptUpload();
 	}
 	
 	public boolean canAcceptUpload() {
 		return state == BuilderState.IDLE || state == BuilderState.ERROR || state == BuilderState.READY
-				|| state == BuilderState.DONE || state == BuilderState.DONEMISSING || state == BuilderState.STOPPED;
+				|| state == BuilderState.DONE || state == BuilderState.DONEMISSING || state == BuilderState.STOPPED
+				|| state == BuilderState.UNLOADED;
+	}
+	public boolean canUnload() {
+		//TODO: Read from Config whether to allow unload
+		return loadedSchematic != null && (state == BuilderState.READY || state == BuilderState.STOPPED || state == BuilderState.ERROR
+				|| state == BuilderState.DONE || state == BuilderState.IDLE);
 	}
 
 	
@@ -1240,6 +1287,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		//Received all data
 		state = BuilderState.PREPARING;
+		preparingState = BuilderState.IDLE; 
 		message = "Parsing";
 		markDirty();
 		sendNetworkUpdateFull(null);
@@ -1447,6 +1495,14 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		}
 	}
 	
+	//Reload after Unload
+	public void actionReload() {
+		if(state != BuilderState.UNLOADED)
+			return;
+		//Reload the Schematic if we can
+		
+	}
+	
 	//Client request Schematic download
 	public void actionDownload(EntityPlayerMP player) {
 		//TODO: Config whether this is enabled or not
@@ -1631,24 +1687,19 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		if(!schematicFile.exists())
 			return false;
 		
-		try {
-			HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
-			loadedSchematic = SchematicLoader.loadSchematic(schematicFile, blockCount);
-			populateResources(blockCount);
-			schematicName = loadedSchematic.name;
-			
-			state = BuilderState.READY;
-		} catch (Exception e) {
-			serverStateError("Failed to load cached Schematic", false);
-			ModLog.printTileErrorPrefix(this);
-			System.err.println("SchematicBuilder failed to load cached Schematic: " + schematicFile);
-			e.printStackTrace();
+		HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
+		loadSchematicWork = SchematicLoaderService.instance.loadFile(schematicFile, blockCount);
+		if(loadSchematicWork != null)
+		{
+			preparingState = state;
+			state = BuilderState.PREPARING;
+			return true;
 		}
-		
-		markDirty();
-		sendNetworkUpdateFull(null);
-		
-		return true;
+		else
+		{
+			serverStateError("Error while starting async loading of Cached Schematic: " + schematicFile, true);
+			return false;
+		}
 	}
 	
 	//Creates a Resource list for the currently loaded Schematic
@@ -1742,7 +1793,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		cachedSchematicFile = nbt.getString("cachedSchematicFile");
 		
 		//Read cached Schematic if needed
-		if(prevState != BuilderState.ERROR || !cachedSchematicFile.trim().isEmpty())
+		if(prevState != BuilderState.ERROR && prevState != BuilderState.UNLOADED && !cachedSchematicFile.trim().isEmpty())
 			loadSavedSchematic();
 		
 		lastX = nbt.getInteger("lastX");
@@ -1755,20 +1806,24 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		//Config
 		config.readFromNBT(nbt, this);
 		
-		//Continue Building
-		if(prevState == BuilderState.BUILDING)
-		{
-			//TODO: Config option to force them into STOPPED state until player manually starts it again
-			state = BuilderState.STOPPED;
-			actionBuild();
-		}
-		else if(prevState == BuilderState.DOWNLOADING)
+
+		if(prevState == BuilderState.DOWNLOADING)
 		{
 			state = BuilderState.ERROR;
 			message = "Download incomplete before chunk unload!";
 		}
+		else if(prevState == BuilderState.UNLOADED)
+		{
+			state = BuilderState.UNLOADED;
+			unloadedState = state.fromValue(nbt.getInteger("unloadedState"));
+		}
 		else
-			state = prevState;
+		{
+			if(state == BuilderState.PREPARING)
+				preparingState = prevState;
+			else
+				state = prevState;
+		}
 		
 		//TODO: Read resource list
     }
@@ -1781,6 +1836,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		//Write state and progress
 		nbt.setShort("tileVersion", tileVersion);
 		nbt.setInteger("state", state.getValue());
+		if(state == BuilderState.UNLOADED)
+			nbt.setInteger("unloadedState", unloadedState.getValue());
 		if(cachedSchematicFile == null)
 			cachedSchematicFile = "";
 		nbt.setString("schematicName", schematicName);

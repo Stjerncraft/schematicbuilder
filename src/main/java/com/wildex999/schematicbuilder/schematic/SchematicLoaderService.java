@@ -5,6 +5,7 @@ import io.netty.buffer.Unpooled;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -17,6 +18,8 @@ import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
+import com.wildex999.schematicbuilder.tiles.BuilderState;
+import com.wildex999.utils.ModLog;
 
 /*
  * Service for loading Schematics in Threads.
@@ -83,16 +86,35 @@ public class SchematicLoaderService {
 	}
 	
 	//Load a Schematic from file
-	public Future<Result> loadFile() {
-		return pool.submit(new FileReadWorker());
+	public Future<Result> loadFile(File file, HashMap<Short, MutableInt> blockCount) {
+		return pool.submit(new FileReadWorker(file, blockCount));
 	}
 	
 	private class FileReadWorker implements Callable<Result> {
 
+		private File file;
+		private HashMap<Short, MutableInt> blockCount;
+		
+		public FileReadWorker(File file, HashMap<Short, MutableInt> blockCount) {
+			this.file = file;
+			this.blockCount = blockCount;
+		}
+		
 		@Override
 		public Result call() throws Exception {
-			// TODO Auto-generated method stub
-			return null;
+			Result result = new Result();
+			result.schematic = null;
+			result.message = "";
+			result.blockCount = blockCount;
+			
+			try {
+				result.schematic = SchematicLoader.loadSchematic(file, blockCount);
+			} catch (Exception e) {
+				result.message = "Failed to load cached Schematic: " + file;
+				e.printStackTrace();
+			}
+			
+			return result;
 		}
 		
 	}

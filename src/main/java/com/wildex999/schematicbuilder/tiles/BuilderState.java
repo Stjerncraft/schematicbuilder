@@ -21,7 +21,9 @@ public enum BuilderState {
 	DONEMISSING(13), //Done, but unable to place some blocks
 	ERROR(14), //Same as IDLE, but show an error message
 	STOPPED(15), //Same as BUILDING, but not actively running
-	WAITINGFORSERVER(16); //Client: Waiting for current status from server(Default when opening GUI)
+	WAITINGFORSERVER(16), //Client: Waiting for current status from server(Default when opening GUI)
+	UNLOADED(17), //Schematic has been unloaded, but previous state is saved allowing a reload
+	RELOADING(18); //Reloading Schematic from unloaded state
 	
 	private final int value;
 	
