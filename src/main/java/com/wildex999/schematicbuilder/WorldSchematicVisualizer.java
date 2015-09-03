@@ -23,6 +23,7 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.shader.TesselatorVertexState;
 import net.minecraft.init.Blocks;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -68,6 +69,17 @@ public class WorldSchematicVisualizer {
 	public TileSchematicBuilder vTile;
 	public TileSchematicBuilder fTile;
 	
+	public class ProgressRender {
+		public boolean render;
+		public int tileX, tileY, tileZ;
+		public int targetX, targetY, targetZ;
+		
+		public boolean isTile(TileEntity tile) {
+			return tile.xCoord == tileX && tile.yCoord == tileY && tile.zCoord == tileZ;
+		}
+	};
+	public ProgressRender progressRender = new ProgressRender();
+	
 	public int sortFreq = 120;
 	public int currentSortFrame = 0;
 	
@@ -98,11 +110,79 @@ public class WorldSchematicVisualizer {
         
 		renderVisualize();
 		renderFrame();
+		renderProgress();
 		
 		GL11.glEnable(GL11.GL_ALPHA_TEST);
 		GL11.glPopMatrix();
 	}
 	
+	private void renderProgress() {
+		if(!progressRender.render)
+			return;
+		
+		Tessellator t = Tessellator.instance;
+		t.startDrawingQuads();
+		t.setTranslation(progressRender.targetX - pPosX, progressRender.targetY - pPosY, (progressRender.targetZ+1) - pPosZ);
+		
+		//Draw Cube
+		//Front
+		t.setColorRGBA(255, 0, 0, 255);
+		t.addVertex(1, 0, 1);
+		t.addVertex(1, 1, 1);
+		t.addVertex(0, 1, 1);
+		t.addVertex(0, 0, 1);
+		
+		//Back
+		t.setColorRGBA(255, 0, 0, 255);
+		t.addVertex(1, 0, 0);
+		t.addVertex(1, 1, 0);
+		t.addVertex(0, 1, 0);
+		t.addVertex(0, 0, 0);
+		
+		//Left
+		t.setColorRGBA(255, 0, 0, 255);
+		t.addVertex(0, 0, 1);
+		t.addVertex(0, 1, 1);
+		t.addVertex(0, 1, 0);
+		t.addVertex(0, 0, 0);
+		
+		//Right
+		t.setColorRGBA(255, 0, 0, 255);
+		t.addVertex(1, 0, 1);
+		t.addVertex(1, 1, 1);
+		t.addVertex(1, 1, 0);
+		t.addVertex(1, 0, 0);
+		
+		//Top
+		t.setColorRGBA(255, 0, 0, 255);
+		t.addVertex(1, 1, 1);
+		t.addVertex(1, 1, 0);
+		t.addVertex(0, 1, 0);
+		t.addVertex(0, 1, 1);
+		
+		//Bottom
+		t.setColorRGBA(255, 0, 0, 255);
+		t.addVertex(1, 0, 1);
+		t.addVertex(1, 0, 0);
+		t.addVertex(0, 0, 0);
+		t.addVertex(0, 0, 1);
+		
+		//GL11.glEnable(GL11.GL_BLEND);
+		//GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+		//GL11.glColor4f(1F, 0F, 0F, 0.5F);
+		GL11.glDisable(GL11.GL_CULL_FACE);
+		GL11.glDepthMask(false);
+		GL11.glDisable(GL11.GL_DEPTH_TEST);
+		
+		Tessellator.instance.draw();
+		Tessellator.instance.setTranslation(0, 0, 0);
+		
+		GL11.glDepthMask(true);
+		GL11.glEnable(GL11.GL_DEPTH_TEST);
+		GL11.glEnable(GL11.GL_CULL_FACE);
+		//GL11.glDisable(GL11.GL_BLEND);
+	}
+
 	public void renderVisualize() {
 		if(vTile == null || vTile.loadedSchematic == null)
 			return;

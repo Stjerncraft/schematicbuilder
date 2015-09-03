@@ -103,6 +103,8 @@ public class BlockSchematicBuilder extends BlockBase {
 		{
 			if(tile instanceof IInventory)
 				dropInventory((IInventory)tile, world, x, y, z);
+			if(tile instanceof TileSchematicBuilder)
+				((TileSchematicBuilder)tile).onBreak();
 		}
 		
 		super.breakBlock(world, x, y, z, block, metadata);

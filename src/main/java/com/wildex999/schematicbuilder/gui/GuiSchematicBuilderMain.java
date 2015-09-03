@@ -28,6 +28,7 @@ import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.shader.TesselatorVertexState;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.ChunkCache;
 
@@ -746,10 +747,46 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		}
 		else if(button == buttonVisualize)
 		{
-			if(WorldSchematicVisualizer.instance.vTile == gui.tile)
-				WorldSchematicVisualizer.instance.vTile = null;
+			WorldSchematicVisualizer visualizer = WorldSchematicVisualizer.instance;
+			
+			//If it's not rendering progress for this tile, stop it
+			if(visualizer.progressRender.render && !visualizer.progressRender.isTile(gui.tile))
+			{
+				TileEntity tempTile = new TileEntity();
+				tempTile.xCoord = visualizer.progressRender.tileX;
+				tempTile.yCoord = visualizer.progressRender.tileY;
+				tempTile.zCoord = visualizer.progressRender.tileZ;
+				MessageBase msg = new MessageActionSchematicBuilder(tempTile, MessageActionSchematicBuilder.ActionType.PROGRESS);
+				msg.sendToServer();
+				visualizer.progressRender.render = false;
+				System.out.println("Stopping old Progress Render");
+			}
+			
+			MessageBase msg = new MessageActionSchematicBuilder(gui.tile, MessageActionSchematicBuilder.ActionType.PROGRESS);
+			if(visualizer.vTile == gui.tile)
+			{
+				visualizer.vTile = null;
+				if(visualizer.progressRender.render)
+				{
+					msg.sendToServer();
+					visualizer.progressRender.render = false;
+					System.out.println("Disable Progress render");
+				}
+			}
 			else
-				WorldSchematicVisualizer.instance.vTile = gui.tile;
+			{
+				visualizer.vTile = gui.tile;
+				if(!visualizer.progressRender.render)
+				{
+					msg.sendToServer();
+					visualizer.progressRender.render = true;
+					System.out.println("Enable progress render");
+				}
+				
+				visualizer.progressRender.tileX = gui.tile.xCoord;
+				visualizer.progressRender.tileY = gui.tile.yCoord;
+				visualizer.progressRender.tileZ = gui.tile.zCoord;
+			}
 		}
 		else if(button == buttonFrame)
 		{

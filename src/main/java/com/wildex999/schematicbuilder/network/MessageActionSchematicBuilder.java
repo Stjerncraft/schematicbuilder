@@ -25,7 +25,8 @@ public class MessageActionSchematicBuilder extends MessageBase {
 		BUILD(0),
 		STOP(1),
 		CONFIG(2),
-		DOWNLOAD(3);
+		DOWNLOAD(3),
+		PROGRESS(4); //Player requesting Progress update(Or stop if already watching)
 		
 		private final int value;
 		
@@ -115,6 +116,9 @@ public class MessageActionSchematicBuilder extends MessageBase {
         		break;
         	case DOWNLOAD:
         		tile.actionDownload(ctx.getServerHandler().playerEntity);
+        		break;
+        	case PROGRESS:
+        		tile.actionProgress(ctx.getServerHandler().playerEntity);
         		break;
         	}
         	

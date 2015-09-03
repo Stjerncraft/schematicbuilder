@@ -11,6 +11,7 @@ import com.wildex999.schematicbuilder.blocks.BlockLibrary;
 import com.wildex999.schematicbuilder.gui.GuiHandler;
 import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
 import com.wildex999.schematicbuilder.network.Networking;
+import com.wildex999.schematicbuilder.schematic.SchematicLoaderService;
 import com.wildex999.utils.ModLog;
 
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -26,13 +27,15 @@ import cpw.mods.fml.common.registry.GameRegistry;
 @Mod(modid = ModSchematicBuilder.MODID, version = ModSchematicBuilder.VERSION, dependencies = "after:CoFHAPI")
 public class ModSchematicBuilder {
 	public static final String MODID = "schematicbuilder";
-	public static final String VERSION = "0.2.3";
+	public static final String VERSION = "0.2.4";
 	public static ModSchematicBuilder instance;
 	
 	public static boolean debug = true;
 	
 	@SidedProxy(clientSide = "com.wildex999.schematicbuilder.ClientProxy", serverSide = "com.wildex999.schematicbuilder.CommonProxy")
 	public static CommonProxy proxy;
+	
+	public static SchematicLoaderService schematicLoaderService;
 	
 	public GuiHandler guiHandler;
 	public static boolean useEnergy;
@@ -51,6 +54,9 @@ public class ModSchematicBuilder {
     	Networking.init();
     	BlockLibrary.init();
     	proxy.initialize();
+    	
+    	//TODO: Load thread count from config
+    	schematicLoaderService = new SchematicLoaderService(2);
     	
     	ModCheck modCheckCoFHAPI = new ModCheckCoFHAPI();
     	if(modCheckCoFHAPI.hasMod())

@@ -1,5 +1,7 @@
 package com.wildex999.schematicbuilder.network;
 
+import org.ietf.jgss.MessageProp;
+
 import com.wildex999.utils.ModLog;
 
 import cpw.mods.fml.common.network.NetworkRegistry;
@@ -24,6 +26,7 @@ public class Networking {
 		
 		channel.registerMessage(MessageUpdateSchematicBuilder.Handler.class, MessageUpdateSchematicBuilder.class, getFreeId(), Side.CLIENT);
 		channel.registerMessage(MessageUploadSchematic.Handler.class, MessageUploadSchematic.class, getFreeId(), Side.CLIENT);
+		channel.registerMessage(MessageUpdateProgress.Handler.class, MessageUpdateProgress.class, getFreeId(), Side.CLIENT);
 		
 		//Release 2
 		//Release 3
