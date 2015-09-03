@@ -53,6 +53,7 @@ import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
 import com.wildex999.schematicbuilder.schematic.SchematicLoader;
 import com.wildex999.schematicbuilder.schematic.SchematicLoaderService;
+import com.wildex999.schematicbuilder.schematic.SchematicLoaderService.Result;
 import com.wildex999.utils.FileChooser;
 import com.wildex999.utils.ModLog;
 
@@ -182,6 +183,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	public HashMap<Short, ResourceItem> resources; //Resources for the currently loaded Schematic
 	public String cachedSchematicFile; //Local file containing the cached Schematic
 	private Future<SchematicLoaderService.Result> loadSchematicWork; //Async Schematic loading progress/result
+	@SideOnly(Side.CLIENT)
+	private boolean uploadAfterLoad; //Whether we are to upload the schematic when it has loaded
+	@SideOnly(Side.CLIENT)
+	private boolean cacheAfterLoad; //Whether to cache Schematic after async load
 	
 	public cofh.api.energy.EnergyStorage energyStorage;
 	private int maxEnergy = 1000000;
@@ -787,7 +792,70 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		if(state == BuilderState.UPLOADING)
 			updateUploadSchematic();
-			
+		
+		if(loadSchematicWork != null)
+		{
+			if(loadSchematicWork.isDone())
+			{
+				Result result;
+				try {
+					result = loadSchematicWork.get();
+					
+					if(result.schematic != null)
+					{
+						loadedSchematic = result.schematic;
+						populateResources(result.blockCount);
+						
+						if(uploadAfterLoad)
+						{ //Upload the loaded Schematic to the server
+							
+							//Give it a name if hasn't got one
+							if(loadedSchematic.name.trim().isEmpty())
+							{
+								int lastIndex = loadFileLocal.getName().lastIndexOf('.');
+								if(lastIndex == -1)
+									loadedSchematic.name = loadFileLocal.getName();
+								else
+									loadedSchematic.name = loadFileLocal.getName().substring(0, lastIndex);
+							}
+							loadFileLocal = null;
+							
+							//Send Schematic to server
+							uploadSchematicToServer();
+						}
+						
+						if(cacheAfterLoad)
+						{
+							//Cache downloaded Schematic
+							File cacheFolder = getCacheFolderClient();
+							File cacheFile = new File(cacheFolder, cachedSchematicFile);
+							try {
+								SchematicLoader.saveSchematic(cacheFile, loadedSchematic);
+							} catch (Exception e) {
+								ModLog.printTileErrorPrefix(this);
+								System.err.println("Failed to save cached Schematic file: " + cachedSchematicFile);
+								e.printStackTrace();
+							}
+						}
+					}
+					else
+					{
+						ModLog.printTileErrorPrefix(this);
+						String error = "Failed to load async schematic file: " + cachedSchematicFile + " Error: " + result.message;
+						System.err.println(error);
+						clientStateError(error);
+					}
+				} catch (Exception e) {
+					ModLog.printTileErrorPrefix(this);
+					String error = "Failed to load Schematic file: " + cachedSchematicFile;
+					System.err.println(error);
+					clientStateError(error);
+					e.printStackTrace();
+				} 
+	
+				loadSchematicWork = null;
+			}
+		}
 	}
 	
 	@SideOnly(Side.CLIENT)
@@ -829,37 +897,19 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	public void updateSchematicChoosing() {
 		if(state != BuilderState.CHOOSINGLOCAL || loadFileLocal == null)
 			return;
+
+		uploadAfterLoad = true;
+		cacheAfterLoad = false;
 		
-		Schematic newSchematic = null;
 		//TODO: Populate resources from Server(As they might have been swapped)
 		HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
-		try {
-			newSchematic = SchematicLoader.loadSchematic(loadFileLocal, blockCount);
-			if(newSchematic.name.trim().isEmpty())
-			{
-				int lastIndex = loadFileLocal.getName().lastIndexOf('.');
-				if(lastIndex == -1)
-					newSchematic.name = loadFileLocal.getName();
-				else
-					newSchematic.name = loadFileLocal.getName().substring(0, lastIndex);
-			}
-		} catch (Exception e) {
-			state = BuilderState.ERROR;
-			message = e.getMessage();
-			ModLog.logger.warn(message);
-		}
+		loadSchematicWork = SchematicLoaderService.instance.loadFile(loadFileLocal, blockCount);
+		if(loadSchematicWork == null)
+			clientStateError("Failed to start async loading of choosen Schematic.");
+		else
+			state = BuilderState.PREPARING;
 		
-		if(state != BuilderState.ERROR)
-		{
-			state = BuilderState.LOADING;
-			loadedSchematic = newSchematic;
-			populateResources(blockCount); //TODO: Get from server
-			
-			//Send Schematic to server
-			uploadSchematicToServer();
-		}
 		
-		loadFileLocal = null;
 		updateGui();
 	}
 	
@@ -919,10 +969,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	@Override
 	public void removeWatcher(EntityPlayer player) {
 		if(worldObj.isRemote)
-		{
-			downloadComplete = true; //Stop download when no longer in GUI
 			return;
-		}
 		
 		//Stop sending Schematic to player
 		abortSendSchematic((EntityPlayerMP)player);
@@ -1060,6 +1107,12 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			{
 				if(loadedSchematic != null)
 					loadedSchematic = null; //Someone else swapped the Schematic, we need to re-download
+				if(loadSchematicWork != null)
+				{
+					//Abort any currently loading Schematic before starting new task
+					loadSchematicWork.cancel(true);
+					loadSchematicWork = null; 
+				}
 				
 				if(schematicId.length() > 0)
 				{
@@ -1068,15 +1121,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 					File cacheFile = new File(cacheFolder, schematicId);
 					if(cacheFile.exists())
 					{
-						try {
-							HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
-							loadedSchematic = SchematicLoader.loadSchematic(cacheFile, blockCount);
-							populateResources(blockCount);
-						} catch (Exception e) {
-							ModLog.printTileErrorPrefix(this);
-							System.err.println("Failed to load cached Schematic file: " + schematicId);
-							e.printStackTrace();
-						} 
+						uploadAfterLoad = false; //We are loading to display localy
+						cacheAfterLoad = false;
+						HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
+						loadSchematicWork = SchematicLoaderService.instance.loadFile(cacheFile, blockCount);
 					}
 					else
 					{
@@ -1311,6 +1359,12 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	}
 	
 	@SideOnly(Side.CLIENT)
+	public void clientStateError(String error) {
+		state = BuilderState.ERROR;
+		message = error;
+	}
+	
+	@SideOnly(Side.CLIENT)
 	public void networkOnDownloadStart(int size) {
 		if(size > maxSchematicBytes || size <= 0)
 			return;
@@ -1322,7 +1376,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	@SideOnly(Side.CLIENT)
 	public void networkOnDownloadData(byte[] data) {
-		if(downloadComplete)
+		if(downloadComplete || uploadData == null)
 			return;
 		
 		System.arraycopy(data, 0, uploadData, uploadOffset, data.length);
@@ -1331,7 +1385,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		if(uploadOffset > uploadData.length)
 		{
 			uploadData = null;
-			downloadComplete = true;
+			downloadComplete = false;
+			cachedSchematicFile = "";
 			return;
 		}
 		
@@ -1339,51 +1394,41 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	@SideOnly(Side.CLIENT)
 	public void networkOnDownloadEnd(boolean abort) {
-		if(downloadComplete)
+		if(downloadComplete || uploadData == null)
 			return;
 		
 		if(abort)
 		{
-			downloadComplete = true;
+			downloadComplete = false;
 			uploadData = null;
+			cachedSchematicFile = "";
 			return;
 		}
 		
 		//Not received enough data
 		if(uploadOffset != uploadData.length)
 		{
-			downloadComplete = true;
+			downloadComplete = false;
 			ModLog.printTileErrorPrefix(this);
-			System.err.println("Failed to download Schematic. Download ended without enough data. Expected: " + uploadData.length + ". Got: " + uploadOffset);
+			String error = "Failed to download Schematic. Download ended without enough data. Expected: " + uploadData.length + ". Got: " + uploadOffset;
+			System.err.println(error);
+			clientStateError(error);
 			uploadData = null;
+			cachedSchematicFile = "";
 			return;
 		}
 		
 		//Read the Schematic
-		try {
-			ByteArrayOutputStream decompressedStream = new ByteArrayOutputStream();
-			IOUtils.copy(new GZIPInputStream(new ByteArrayInputStream(uploadData)), decompressedStream);
-			
-			ByteBuf buf = Unpooled.wrappedBuffer(decompressedStream.toByteArray());
-			HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
-			loadedSchematic = Schematic.fromBytes(buf, blockCount);
-			populateResources(blockCount);
-			
-			//Cache downloaded Schematic
-			File cacheFolder = getCacheFolderClient();
-			File cacheFile = new File(cacheFolder, cachedSchematicFile);
-			try {
-				SchematicLoader.saveSchematic(cacheFile, loadedSchematic);
-			} catch (Exception e) {
-				ModLog.printTileErrorPrefix(this);
-				System.err.println("Failed to save cached Schematic file: " + cachedSchematicFile);
-				e.printStackTrace();
-			}
-			
-		} catch(Exception e) {
-			ModLog.printTileErrorPrefix(this);
-			System.err.println("Error while reading downloaded Schematic");
-			e.printStackTrace();
+		uploadAfterLoad = false;
+		cacheAfterLoad = true;
+		
+		HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
+		loadSchematicWork = SchematicLoaderService.instance.loadSerialized(uploadData, blockCount);
+		if(loadSchematicWork == null)
+		{
+			String error = "Failed to start async load of downloaded Schematic: " + schematicName;
+			System.err.println(error);
+			clientStateError(error);
 		}
 		
 		downloadComplete = true;

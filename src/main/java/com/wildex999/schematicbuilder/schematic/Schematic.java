@@ -121,6 +121,15 @@ public class Schematic {
 		return chunks;
 	}
 	
+	public ArrayList<SchematicBlock> getChunkAt(int x, int y, int z) {
+		if(x >= width || y >= height || z >= length)
+			return null;
+		if(x < 0 || y < 0 || z < 0)
+			return null;
+		
+		return chunks.get(getChunkIndex(x >> 4, y >> 4, z >> 4));
+	}
+	
 	//Serializing
 	public void toBytes(ByteBuf buf) {
 		buf.writeInt(serializedVersion);
