@@ -1,5 +1,7 @@
 package com.wildex999.schematicbuilder;
 
+import java.io.File;
+
 import org.lwjgl.input.Keyboard;
 
 import net.minecraft.client.settings.KeyBinding;
@@ -8,9 +10,14 @@ import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
+import com.wildex999.schematicbuilder.config.ConfigurationManager;
+import com.wildex999.schematicbuilder.config.ConfigurationManagerGeneral;
+import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.gui.GuiHandler;
 import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
+import com.wildex999.schematicbuilder.network.MessageUploadSchematic;
 import com.wildex999.schematicbuilder.network.Networking;
+import com.wildex999.schematicbuilder.schematic.SchematicLoader;
 import com.wildex999.schematicbuilder.schematic.SchematicLoaderService;
 import com.wildex999.utils.ModLog;
 
@@ -25,12 +32,15 @@ import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 
 @Mod(modid = ModSchematicBuilder.MODID, version = ModSchematicBuilder.VERSION, dependencies = "after:CoFHAPI")
-public class ModSchematicBuilder {
+public class ModSchematicBuilder implements IConfigListener{
 	public static final String MODID = "schematicbuilder";
-	public static final String VERSION = "0.2.4";
+	public static final String VERSION = "0.2.5";
 	public static ModSchematicBuilder instance;
 	
+	public static ConfigurationManagerGeneral configGeneral;
 	public static boolean debug = true;
+	
+	public static ResourceManager resourceManager;
 	
 	@SidedProxy(clientSide = "com.wildex999.schematicbuilder.ClientProxy", serverSide = "com.wildex999.schematicbuilder.CommonProxy")
 	public static CommonProxy proxy;
@@ -44,6 +54,11 @@ public class ModSchematicBuilder {
     public void preInit(FMLPreInitializationEvent event)
     {
     	ModLog.init(event.getModLog());
+    	
+    	//Load Config
+    	configGeneral = new ConfigurationManagerGeneral(new File(event.getModConfigurationDirectory(), MODID+".cfg"));
+    	configGeneral.loadConfig();
+    	configGeneral.addConfigListener(this);
     }
     
     @EventHandler
@@ -55,22 +70,31 @@ public class ModSchematicBuilder {
     	BlockLibrary.init();
     	proxy.initialize();
     	
-    	//TODO: Load thread count from config
-    	schematicLoaderService = new SchematicLoaderService(2);
+    	onConfigReload(configGeneral);
+    	
+    	if(configGeneral.loaderThreadCount < 1)
+    		configGeneral.loaderThreadCount = 1;
+    	schematicLoaderService = new SchematicLoaderService(configGeneral.loaderThreadCount);
     	
     	ModCheck modCheckCoFHAPI = new ModCheckCoFHAPI();
-    	if(modCheckCoFHAPI.hasMod())
+    	if(configGeneral.energyEnabled)
     	{
-    		System.out.println("CoFHAPI found, Blocks will require energy.");
-    		useEnergy = true;
+	    	if(modCheckCoFHAPI.hasMod())
+	    	{
+	    		System.out.println("CoFHAPI found, Blocks will require energy.");
+	    		useEnergy = true;
+	    	}
+	    	else
+	    	{
+	    		System.out.println("CoFHAPI not found, Blocks will not require energy.");
+	    		useEnergy = false;
+	    	}
     	}
     	else
-    	{
-    		System.out.println("CoFHAPI not found, Blocks will not require energy.");
     		useEnergy = false;
-    	}
-    	//TODO: FOR TESTING
-    	useEnergy = false;
+    	
+    	//Init Resources
+    	resourceManager = new ResourceManager();
     	
     	//Init GUI
     	guiHandler = new GuiHandler();
@@ -90,4 +114,13 @@ public class ModSchematicBuilder {
     	
     	ModLog.logger.info("Schematic Builder initialized!");
     }
+
+	@Override
+	public void onConfigReload(ConfigurationManager configManager) {
+    	this.debug = configGeneral.debug;
+    	SchematicLoader.writeCompressed = configGeneral.writeCacheCompressed;
+    	
+    	MessageUploadSchematic.packetSize = configGeneral.networkTransferRate; //TODO: Send this to client too
+    	
+	}
 }

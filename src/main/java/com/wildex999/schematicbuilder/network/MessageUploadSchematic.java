@@ -22,10 +22,6 @@ import io.netty.buffer.ByteBuf;
 
 //Upload Schematic to server
 
-//TODO: Allow for splitting into multiple part
-//With a Start type to indicate an upload, with name and size(And to check if allowed)
-//A Data type to contain data, limited to a certain amount of bytes per message
-//And an End indicator
 
 //If the Upload is allowed the server will send an 'Uploading' state to the client uploading,
 //While everyone else will get an 'Downloading' state.
@@ -60,7 +56,7 @@ public class MessageUploadSchematic extends MessageBase {
 		}
 	};
 	
-	public static int packetSize = 1024; //TODO: Config option
+	public static int packetSize = 1024;
 	
 	TileEntityInfo tileInfo;
 	UploadType type;

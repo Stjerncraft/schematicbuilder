@@ -1,8 +1,11 @@
 package com.wildex999.schematicbuilder.schematic;
 
+import com.wildex999.schematicbuilder.blocks.BlockLibrary;
+
 import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
 import cpw.mods.fml.common.registry.GameData;
 import net.minecraft.block.Block;
+import net.minecraft.init.Blocks;
 
 //Data for a block in a Schematic
 
@@ -10,10 +13,10 @@ public class SchematicBlock {
 	private static final FMLControlledNamespacedRegistry<Block> BlockRegistry = GameData.getBlockRegistry();
 	
 	private short block;
-	public byte metaData;
+	private byte metaData;
 	
 	public SchematicBlock(Block block, byte metaData) {
-		this.block = (short) BlockRegistry.getId(block);
+		this.block = (short) Block.getIdFromBlock(block);
 		this.metaData = metaData;
 	}
 	
@@ -22,11 +25,33 @@ public class SchematicBlock {
 		this.metaData = metaData;
 	}
 	
-	public Block getBlock() {
-		return BlockRegistry.getObjectById(block);
+	public Block getServerBlock(Schematic schematic) {
+		SchematicMap map = schematic.getSchematicMap(block, metaData, false);
+		if(map == null || map.blockId == -1)
+			return null;
+		return BlockRegistry.getObjectById(map.blockId);
 	}
 	
-	public int getBlockId() {
+	public byte getMeta(Schematic schematic) {
+		SchematicMap map = schematic.getSchematicMap(block, metaData, false);
+		if(map == null || map.blockId == -1)
+			return metaData;
+		return map.meta;
+	}
+	
+	public short getServerBlockId(Schematic schematic) {
+		SchematicMap map = schematic.getSchematicMap(block, metaData, false);
+		if(map == null || map.blockId == -1)
+			return -1;
+		return map.blockId;
+	}
+	
+	//Get original BlockId
+	public int getOriginalBlockId() {
 		return block;
+	}
+	
+	public byte getOriginalMeta() {
+		return metaData;
 	}
 }

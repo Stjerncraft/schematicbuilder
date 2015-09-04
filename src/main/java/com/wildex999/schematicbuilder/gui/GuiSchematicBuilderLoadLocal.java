@@ -41,6 +41,7 @@ import net.minecraft.world.ChunkCache;
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.SchematicWorldCache;
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
+import com.wildex999.schematicbuilder.config.StorageDirectories;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
 import com.wildex999.schematicbuilder.gui.elements.GuiButtonCustom;
 import com.wildex999.schematicbuilder.gui.elements.GuiButtonStretched;
@@ -118,7 +119,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 	
 	private void loadSchematics() {
 		//Load files
-		File loadFolder = TileSchematicBuilder.getLoadFolderClient();
+		File loadFolder = StorageDirectories.getLoadFolderClient();
 		File[] fileList = loadFolder.listFiles(new FilenameFilter() {
 			public boolean accept(File directory, String fileName) {
 				return fileName.endsWith(".schematic");
@@ -133,11 +134,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 			String fileName = entry.getKey();
 			//TODO: Use fileList to check instead to avoid hammering drive
 			if(!new File(loadFolder, fileName).exists())
-			{
-				GuiListEntry listEntry = schematicFiles.remove(fileName);
-				if(listEntry != null)
 					it.remove();
-			}
 		}
 		
 		//Check and load metadata for Schematics
@@ -303,7 +300,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		else if(buttonSchematicsFolder.isOver(mouseX, mouseY))
 		{
 			textList.add("Open folder that Schematics are loaded from.");
-			textList.add(TileSchematicBuilder.getLoadFolderClient().getAbsolutePath());
+			textList.add(StorageDirectories.getLoadFolderClient().getAbsolutePath());
 		}
 		else if(buttonRefresh.isOver(mouseX, mouseY))
 		{
@@ -393,7 +390,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		else if(button == buttonSchematicsFolder)
 		{
 			try {
-				Desktop.getDesktop().open(TileSchematicBuilder.getLoadFolderClient());
+				Desktop.getDesktop().open(StorageDirectories.getLoadFolderClient());
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

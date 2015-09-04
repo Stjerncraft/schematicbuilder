@@ -22,6 +22,7 @@ import net.minecraft.nbt.NBTTagCompound;
 
 public class Schematic {
 	
+	public static int blockIdAir = 0; //TODO: Actually get the BlockId of air
 	public int serializedVersion = 1; //Used to handle backwards compatibility for server saved Schematics
 	public String name;
 	public String author;
@@ -35,6 +36,8 @@ public class Schematic {
 	private int chunksZ;
 	protected int chunkSize = 16; //Note: Parts of getBlock and setBlock is hardcoded for 16 chunksize
 	protected List<ArrayList<SchematicBlock>> chunks;
+	//protected HashMap<Integer>
+	public HashMap<Integer, SchematicMap> schematicMap;
 	
 	public Schematic(int width, int height, int length) {
 		this.width = width;
@@ -51,6 +54,8 @@ public class Schematic {
 		chunks = new ArrayList<ArrayList<SchematicBlock>>(chunkCount);
 		for(int i = 0; i < chunkCount; i++)
 			chunks.add(null);
+		
+		schematicMap = new HashMap<Integer, SchematicMap>();
 	}
 	
 	//Get the index of the given chunk
@@ -64,11 +69,11 @@ public class Schematic {
 		return (y * chunkSize * chunkSize) + (z * chunkSize) + x;
 	}
 	
-	public void setBlock(int x, int y, int z, Block block, byte metaData) {
-		if(block == null || block == Blocks.air)
+	public void setBlock(int x, int y, int z, short blockId, byte metaData) {
+		if(blockId == 0)
 			setBlock(x, y, z, null);
 		else
-			setBlock(x, y, z, new SchematicBlock(block, metaData));
+			setBlock(x, y, z, new SchematicBlock(blockId, metaData));
 	}
 	
 	public void setBlock(int x, int y, int z, SchematicBlock block) {
@@ -130,6 +135,29 @@ public class Schematic {
 		return chunks.get(getChunkIndex(x >> 4, y >> 4, z >> 4));
 	}
 	
+	//Add a mapping from Schematic Block Id to Server Block Id
+	public SchematicMap addSchematicMap(short originalBlockId, byte originalMeta, String originalName, short blockId, byte meta) {
+		SchematicMap map = new SchematicMap();
+		map.originalBlockId = originalBlockId;
+		map.originalMeta = originalMeta;
+		map.originalName = originalName;
+		map.blockId = blockId;
+		map.meta = meta;
+		
+		this.schematicMap.put((originalBlockId << 4) | meta, map);
+		return map;
+	}
+	
+	//Get the mapping for the given Schematic Block ID
+	//canIgnoreMeta: If true, it will return the entry for meta=0 if no entry exists for the given meta
+	public SchematicMap getSchematicMap(short originalBlockId, byte meta, boolean canIgnoreMeta) {
+		SchematicMap map = schematicMap.get((originalBlockId << 4) | meta);
+		if(canIgnoreMeta && map == null && meta != 0)
+			map = schematicMap.get(originalBlockId << 4);
+		
+		return map;
+	}
+	
 	//Serializing
 	public void toBytes(ByteBuf buf) {
 		buf.writeInt(serializedVersion);
@@ -140,6 +168,11 @@ public class Schematic {
 		buf.writeInt(length);
 		
 		int emptyChunks = 0;
+		
+		//Write Schematic Map
+		buf.writeInt(schematicMap.size());
+		for(SchematicMap map : schematicMap.values())
+			map.toBytes(buf);
 		
 		//Write Chunks
 		for(int chunkX = 0; chunkX < chunksX; chunkX++)
@@ -175,8 +208,8 @@ public class Schematic {
 								
 								//As of writing this, the max BlockID is 4096, so it fit into 12 bits.
 								//MetaData is 4 bits, so we can pack both into 16 bits.
-								short data = (short) (block.getBlockId() << 4);
-								data |= (short)(block.metaData & 0xF);
+								short data = (short) (block.getOriginalBlockId() << 4);
+								data |= (short)(block.getOriginalMeta() & 0xF);
 								buf.writeShort(data);
 							}
 						}
@@ -218,6 +251,15 @@ public class Schematic {
 		
 		//TODO: Handle loading old serialized Schematic versions
 		
+		//Read Schematic Map
+		int mapCount = buf.readInt();
+		for(int m=0; m<mapCount; m++)
+		{
+			SchematicMap map = new SchematicMap();
+			map.fromBytes(buf);
+			newSchematic.schematicMap.put((map.originalBlockId << 4) | map.originalMeta, map);
+		}
+		
 		//Read Chunks
 		for(int chunkX = 0; chunkX < chunksX; chunkX++)
 		{
@@ -244,13 +286,12 @@ public class Schematic {
 								int blockId = (data >> 4) & 0xFFF; //Get left 12 bits
 								byte meta = (byte) (data & 0xF); //Get right 4 bits
 
-								Block block = BlockRegistry.getRaw(blockId); //Allow it to return null for unknown ID
-								newSchematic.setBlock(x, y, z, block, meta);
+								newSchematic.setBlock(x, y, z, (short)blockId, meta);
 								
-								if(blockCount != null && block != null)
+								if(blockCount != null && blockId != blockIdAir )
 								{
 									if(blockId >= SchematicLoader.maxBlockId && ModSchematicBuilder.debug)
-										System.out.println("Over block id for block: " + block);
+										System.out.println("Over block id for block: " + blockId);
 									
 									short index = (short) ((blockId << 4) | meta);
 									MutableInt count = blockCount.get(index);

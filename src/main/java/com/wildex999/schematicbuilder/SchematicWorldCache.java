@@ -38,11 +38,22 @@ public class SchematicWorldCache implements IBlockAccess {
 			{
 				for(int z = 0; z < schematic.getLength(); z++)
 				{
-					SchematicBlock block = schematic.getBlock(x, y, z);
+					SchematicBlock schematicBlock = schematic.getBlock(x, y, z);
+					Block block;
+					byte meta = 0;
+					if(schematicBlock != null)
+					{
+						block = schematicBlock.getServerBlock(schematic);
+						meta = schematicBlock.getMeta(schematic);
+					}
+					else
+						block = null;
+
+					
 					if(block != null)
 					{
-						blocks.add(block.getBlock());
-						metadata.add(block.metaData);
+						blocks.add(block);
+						metadata.add(meta);
 					}
 					else
 					{

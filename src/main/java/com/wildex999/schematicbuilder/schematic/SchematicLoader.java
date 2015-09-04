@@ -11,6 +11,8 @@ import java.util.Set;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 
+import com.wildex999.schematicbuilder.config.ConfigurationManager;
+import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.exceptions.ExceptionInvalid;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
 import com.wildex999.schematicbuilder.exceptions.ExceptionSave;
@@ -60,7 +62,7 @@ public class SchematicLoader {
 	
 	public static final short maxBlockId = 4095;
 	
-	public static boolean writeCompressed = true; //TODO: Add as config option
+	public static boolean writeCompressed = true;
 	
 	private static final FMLControlledNamespacedRegistry<Block> BlockRegistry = GameData.getBlockRegistry();
 	
@@ -162,13 +164,16 @@ public class SchematicLoader {
         }
         
         //Read Mapping for name to id if included
-        Map<Integer, Integer> nameMap = null;
+        HashMap<Integer, String> nameMap = new HashMap<Integer, String>();
         if(tagCompound.hasKey(NBT_MAPPING_SCHEMATICA)) {
-        	nameMap = new HashMap<Integer, Integer>();
         	NBTTagCompound mapping = tagCompound.getCompoundTag(NBT_MAPPING_SCHEMATICA);
         	Set<String> names = mapping.func_150296_c();
         	for(String name : names) {
-        		nameMap.put(mapping.getInteger(name), BlockRegistry.getId(name));
+        		int schematicBlockId = mapping.getInteger(name);
+        		int serverBlockId = BlockRegistry.getId(name);
+        		
+        		schematic.addSchematicMap((short)schematicBlockId, (byte)0, name, (short)serverBlockId, (byte)0);
+        		nameMap.put(schematicBlockId, name);
         	}
         }
         
@@ -186,25 +191,27 @@ public class SchematicLoader {
         			int blockID = blocks[index] & 0xFF;
         			if(extraData)
         				blockID = blockID | ((extraBlocks[index] & 0xFF) << 8);
-        			byte meta = (byte)(metaData[index] & 0xFF);
+        			byte meta = (byte)(metaData[index] & 0xF);
         			
-        			//Map to the new correct block ID if a name map was included
-        			int originalId = blockID;
-        			if(nameMap != null)
+        			//Create a mapping for this BlockID & meta if it does not exist
+        			SchematicMap map = schematic.getSchematicMap((short) blockID, meta, false);
+        			if(map == null)
         			{
-        				Integer id = nameMap.get(blockID);
-        				if(id != null)
-        					blockID = id;
+        				Block block = BlockRegistry.getObjectById(blockID);
+        				short serverBlockId;
+        				if(block != null)
+        					serverBlockId = (short)blockID;
+        				else
+        					serverBlockId = -1;
+        				map = schematic.addSchematicMap((short) blockID, meta, nameMap.size() > 0 ? nameMap.get(blockID) : null, serverBlockId, meta);
         			}
         			
-        			Block block = BlockRegistry.getRaw(blockID); //Allow it to return null for unknown ID
-        			//TODO: Replace with Unobtainium for the specific unknown id
-        			schematic.setBlock(x, y, z, block, meta);
+        			schematic.setBlock(x, y, z, (short) blockID, meta);
         			
-					if(blockCount != null && block != Blocks.air)
+					if(blockCount != null && blockID != schematic.blockIdAir)
 					{
 						if(blockID >= SchematicLoader.maxBlockId)
-							System.out.println("Over block id for block: " + block);
+							System.out.println("Over block id for block: " + blockID);
 						
 						short blockIndex = (short) ((blockID << 4) | meta);
 						MutableInt count = blockCount.get(blockIndex);
@@ -246,7 +253,7 @@ public class SchematicLoader {
 		byte extra[] = new byte[(schematic.getWidth()*schematic.getHeight()*schematic.getLength())/2]; //4 bit packed
 		String mapping[] = new String[maxBlockId+1]; //One name per id
 		boolean gotExtraData = false;
-		SchematicBlock airBlock = new SchematicBlock(Blocks.air, (byte) 0);
+		SchematicBlock airBlock = new SchematicBlock(schematic.blockIdAir, (byte) 0);
 		
 		for(int x = 0; x < schematic.getWidth(); x++)
 		{
@@ -260,7 +267,7 @@ public class SchematicLoader {
 					if(sBlock == null)
 						sBlock = airBlock;
 					
-					int blockId = sBlock.getBlockId();
+					int blockId = sBlock.getOriginalBlockId();
 					
 					blocks[index] = (byte) (blockId & 0xFF);
 					if(blockId > 255)
@@ -269,10 +276,14 @@ public class SchematicLoader {
 						extra[index/2] |= (byte) ((blockId >> 8) << (part*4));
 					}
 					//meta[index/2] |= sBlock.metaData << (part*4);
-					meta[index] = sBlock.metaData; //Currently uses a full byte instead of compressing down to 4 bits
+					meta[index] = sBlock.getOriginalMeta(); //Currently uses a full byte instead of compressing down to 4 bits
 					
 					if(mapping[blockId] == null)
-						mapping[blockId] = Block.blockRegistry.getNameForObject(sBlock.getBlock());
+					{
+						SchematicMap map = schematic.getSchematicMap((short) sBlock.getOriginalBlockId(), sBlock.getOriginalMeta(), false);
+						if(map == null || map.originalName == null)
+							mapping[blockId] = "";
+					}
 				}
 			}
 		}
@@ -286,7 +297,7 @@ public class SchematicLoader {
 		NBTTagCompound mappingTag = new NBTTagCompound();
 		for(short blockId = 0; blockId <= maxBlockId; blockId++)
 		{
-			if(mapping[blockId] == null)
+			if(mapping[blockId] == null || mapping[blockId].isEmpty())
 				continue;
 			mappingTag.setShort(mapping[blockId], blockId);
 		}

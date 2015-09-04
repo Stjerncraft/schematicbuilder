@@ -667,8 +667,8 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 					SchematicBlock block = schematic.getBlock(x, y, z);
 					if(block == null)
 						continue;
-					Block realBlock = block.getBlock();
-					if(realBlock.getMaterial() == Material.air)
+					Block realBlock = block.getServerBlock(cachedRenderSchematic);
+					if(realBlock == null || realBlock.getMaterial() == Material.air)
 						continue;
 					
 					renderBlocksRi.renderBlockByRenderType(realBlock, x, y, z);

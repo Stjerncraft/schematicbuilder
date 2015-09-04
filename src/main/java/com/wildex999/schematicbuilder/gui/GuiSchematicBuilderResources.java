@@ -99,7 +99,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	public void onTabActivated() {
 		//Set Floor
 		if(gui.tile.config.floorBlock != null)
-			buttonFloorItem.setItem(new ItemStack(gui.tile.config.floorBlock.getBlock(), 1, gui.tile.config.floorBlock.metaData));
+			buttonFloorItem.setItem(new ItemStack((Block) Block.blockRegistry.getObjectById(gui.tile.config.floorBlock.getOriginalBlockId()), 1, gui.tile.config.floorBlock.getOriginalMeta()));
 		else
 			buttonFloorItem.setItem(null);
 		

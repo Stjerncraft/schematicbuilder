@@ -35,9 +35,13 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import cpw.mods.fml.common.Optional;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
+import com.wildex999.schematicbuilder.ResourceEntry;
 import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.SchematicWorldCache;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
+import com.wildex999.schematicbuilder.config.ConfigurationManager;
+import com.wildex999.schematicbuilder.config.IConfigListener;
+import com.wildex999.schematicbuilder.config.StorageDirectories;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
 import com.wildex999.schematicbuilder.exceptions.ExceptionSave;
 import com.wildex999.schematicbuilder.gui.IGuiWatchers;
@@ -73,15 +77,17 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryBasic;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityFlowerPot;
 import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.common.util.ForgeDirection;
 
 @Optional.Interface(iface = "cofh.api.energy.IEnergyHandler", modid = "CoFHAPI|energy")
-public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, cofh.api.energy.IEnergyHandler {
+public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IConfigListener, cofh.api.energy.IEnergyHandler {
 
 	protected final static String inventoryName = "Schematic Builder";
 	protected InventoryBasic inventory;
@@ -98,8 +104,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		public void toBytes(ByteBuf buf) {
 			buf.writeInt(passCount);
 			buf.writeBoolean(placeFloor);
-			buf.writeInt(Block.getIdFromBlock(floorBlock.getBlock()));
-			buf.writeByte(floorBlock.metaData);
+			buf.writeInt(floorBlock.getOriginalBlockId());
+			buf.writeByte(floorBlock.getOriginalMeta());
 			buf.writeBoolean(placeAir);
 		}
 		
@@ -117,8 +123,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			nbt.setInteger("passCount", passCount);
 			nbt.setBoolean("placeFloor", placeFloor);
 			if(floorBlock != null)
-				nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(floorBlock.getBlock()));
-			nbt.setByte("floorBlockMeta", floorBlock.metaData);
+				nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(Block.blockRegistry.getObjectById(floorBlock.getOriginalBlockId())));
+			nbt.setByte("floorBlockMeta", floorBlock.getOriginalMeta());
 			nbt.setBoolean("placeAir", placeAir);
 	    }
 	    
@@ -189,10 +195,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	private boolean cacheAfterLoad; //Whether to cache Schematic after async load
 	
 	public cofh.api.energy.EnergyStorage energyStorage;
-	private int maxEnergy = 1000000;
-	private int energyCostNOP = 10; //Energy cost of doing nothing(Skip air, block already exists etc.)
-	private int energyCostPlace = 50; //Energy cost of placing a non-air block
-	private float energyModifierPass2 = 0.5f; //Multiplier for energy cost in the second pass
+	private int maxEnergy;
+	private int energyCostNOP; //Energy cost of doing nothing(Skip air, block already exists etc.)
+	private int energyCostPlace; //Energy cost of placing a non-air block
+	private float energyModifierPass2; //Multiplier for energy cost in the second pass
 	
 	private int chunkSize = 16;
 	
@@ -212,7 +218,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	private int lastUploadTicks = 0; //Ticks since last data message while receiving upload
 	
 	private FMLControlledNamespacedRegistry<Block> blockRegistry;
-	private boolean debug = true; //TODO: Move to config
 	private short tileVersion = 1; //Version number used to detect old saved Tiles and try to correctly handle loading them
 	
 	//Uploading
@@ -282,6 +287,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		if(!initialized) {
 			if(!worldObj.isRemote && state == BuilderState.WAITINGFORSERVER)
 				state = BuilderState.IDLE;
+			
+			ModSchematicBuilder.configGeneral.addConfigListener(this);
+			onConfigReload(ModSchematicBuilder.configGeneral);
 			
 			direction = worldObj.getBlockMetadata(xCoord, yCoord, zCoord);
 			buildX = xCoord;
@@ -537,11 +545,12 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		int width = loadedSchematic.getWidth();
 		int height = loadedSchematic.getHeight();
 		int length = loadedSchematic.getLength();
-		int airRepeat = 5; //Allow 5 Air blocks per tick (TODO: Place in config)
+		int airRepeat = ModSchematicBuilder.configGeneral.nopRepeat;
 		if(currentPass == 1)
-			airRepeat = 10; //10 Air blocks per tick on pass 2
+			airRepeat = ModSchematicBuilder.configGeneral.nopRepeatPassTwo;
 		SchematicBlock block = null;
 		Block newBlock = null;
+		byte meta = 0;
 		
 		int prevPlacedCount = placedCount;
 		boolean needEnergy = false;
@@ -564,7 +573,18 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 				//Place the block
 				if(block == null)
 					block = defaultBlock;
-				newBlock = block.getBlock();
+				
+				if(block != config.floorBlock && block != defaultBlock)
+					newBlock = block.getServerBlock(loadedSchematic);
+				else
+					newBlock = Block.getBlockById(block.getOriginalBlockId());
+				if(newBlock == null)
+				{
+					newBlock = Blocks.air;
+					meta = 0;
+				}
+				else
+					meta = block.getMeta(loadedSchematic);
 				
 				if(newBlock != Blocks.air  || config.placeAir)
 				{
@@ -579,7 +599,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 					}
 					
 					Block oldBlock = worldObj.getBlock(x, y, z);
-					if(oldBlock != newBlock || block.metaData != worldObj.getBlockMetadata(x, y, z))
+					if(oldBlock != newBlock || meta != worldObj.getBlockMetadata(x, y, z))
 					{
 						if(oldBlock != Blocks.air)
 						{
@@ -591,7 +611,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 						if(newBlock != Blocks.air) //Only place block if it isn't air(So we don't go replacing air blocks with air blocks)
 						{
 							if(newBlock.canPlaceBlockAt(worldObj, x, y, z))
-								worldObj.setBlock(x, y, z, newBlock, block.metaData, 2);
+								worldObj.setBlock(x, y, z, newBlock, meta, 2);
 						}
 						wasAir = false;
 					}
@@ -611,7 +631,17 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			case 1: //Pass 2: Place missing blocks, and correct metadata
 				if(block == null)
 					block = defaultBlock;
-				newBlock = block.getBlock();
+				if(block != defaultBlock)
+					newBlock = block.getServerBlock(loadedSchematic);
+				else
+					newBlock = Block.getBlockById(block.getOriginalBlockId());
+				if(newBlock == null)
+				{
+					newBlock = Blocks.air;
+					meta = 0;
+				}
+				else
+					meta = block.getMeta(loadedSchematic);
 				
 				if(newBlock != Blocks.air)
 				{
@@ -628,14 +658,14 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 					Block placedBlock = worldObj.getBlock(x, y, z);
 					if(placedBlock != newBlock)
 					{
-						worldObj.setBlock(x, y, z, newBlock, block.metaData, 2);
+						worldObj.setBlock(x, y, z, newBlock, meta, 2);
 						wasAir = false;
 					}
 					
 					int placedMeta = worldObj.getBlockMetadata(x, y, z);
-					if(placedMeta != block.metaData) //Reinforce the metadata, as some blocks change it when placed
+					if(placedMeta != meta) //Reinforce the metadata, as some blocks change it when placed
 					{
-						worldObj.setBlockMetadataWithNotify(x, y, z, block.metaData, 0);
+						worldObj.setBlockMetadataWithNotify(x, y, z, meta, 0);
 						worldObj.markBlockForUpdate(x, y, z); //Using the flags for notify will cause neighboring blocks to drop/change
 						wasAir = false;
 					}
@@ -683,7 +713,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 						chunkZ++;
 					}
 					lastX = chunkX*chunkSize;
-					if(chunkZ > Math.ceil((float)length/chunkSize))
+					if(chunkZ >= Math.ceil((float)length/chunkSize))
 					{
 						chunkZ = 0;
 						chunkY++;
@@ -692,6 +722,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 					lastY = chunkY*chunkSize;
 					if(config.placeFloor && lastY == 0)
 						lastY = -1;
+					
+					//TODO: Fix it building outside Schematic once reaching end chunk layer and before moving to the next
+					//Fixed by setting chunkZ >= ?
 				}
 				else
 				{ //End of Build
@@ -827,7 +860,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 						if(cacheAfterLoad)
 						{
 							//Cache downloaded Schematic
-							File cacheFolder = getCacheFolderClient();
+							File cacheFolder = StorageDirectories.getCacheFolderClient();
 							File cacheFile = new File(cacheFolder, cachedSchematicFile);
 							try {
 								SchematicLoader.saveSchematic(cacheFile, loadedSchematic);
@@ -1081,7 +1114,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			//Delete old cache
 			if(cachedSchematicFile != null)
 			{
-				File cacheFolder = getCacheFolderClient();
+				File cacheFolder = StorageDirectories.getCacheFolderClient();
 				File cachedFile = new File(cacheFolder, cachedSchematicFile);
 				if(cachedFile.exists())
 					cachedFile.delete();
@@ -1092,7 +1125,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 				if(schematicId.length() > 0)
 				{
 					//Write our Upload to cache
-					File cacheFolder = getCacheFolderClient();
+					File cacheFolder = StorageDirectories.getCacheFolderClient();
 					File cacheFile = new File(cacheFolder, schematicId);
 					try {
 						SchematicLoader.saveSchematic(cacheFile, loadedSchematic);
@@ -1117,7 +1150,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 				if(schematicId.length() > 0)
 				{
 					//Check if we have this schematic cached
-					File cacheFolder = getCacheFolderClient();
+					File cacheFolder = StorageDirectories.getCacheFolderClient();
 					File cacheFile = new File(cacheFolder, schematicId);
 					if(cacheFile.exists())
 					{
@@ -1129,9 +1162,11 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 					else
 					{
 						//Request Schematic download
-						//TODO: Config whether this is enabled or not
-						MessageBase netMessage = new MessageActionSchematicBuilder(this, ActionType.DOWNLOAD);
-						netMessage.sendToServer();
+						if(ModSchematicBuilder.configGeneral.acceptSendSchematic)
+						{
+							MessageBase netMessage = new MessageActionSchematicBuilder(this, ActionType.DOWNLOAD);
+							netMessage.sendToServer();
+						}
 					}
 				}
 			}
@@ -1224,7 +1259,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		//Only allow Uploads if we aren't doing anything else
 		if(!canAcceptUpload())
 		{
-			if(debug)
+			if(ModSchematicBuilder.debug)
 			{
 				ModLog.printTileInfoPrefix(this);
 				System.out.println("Start upload failed due to not accepted from player: " + uploader.getDisplayName());
@@ -1235,7 +1270,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		if(size < 0 || size > maxSchematicBytes)
 		{
-			if(debug)
+			if(ModSchematicBuilder.debug)
 			{
 				ModLog.printTileInfoPrefix(this);
 				System.out.println("Start upload failed due to file size(" + size + " bytes) from player: " + uploader.getDisplayName());
@@ -1243,7 +1278,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			serverStateError("Upload failed due to illegal size: " + size + " bytes. Server max: " + maxSchematicBytes + " bytes.", true);
 			return;
 		}
-		if(debug)
+		if(ModSchematicBuilder.debug)
 		{
 			ModLog.printTileInfoPrefix(this);
 			System.out.println("Start upload(" + size + " bytes) from player: " + uploader.getDisplayName());
@@ -1258,7 +1293,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		//Cleanup old cached schematic
 		if(!cachedSchematicFile.isEmpty())
 		{
-			File saveFolder = getSaveFolderServer();
+			File saveFolder = StorageDirectories.getSaveFolderServer();
 			File cachedFile = new File(saveFolder, cachedSchematicFile);
 			if(cachedFile.exists())
 			{
@@ -1550,8 +1585,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	//Client request Schematic download
 	public void actionDownload(EntityPlayerMP player) {
-		//TODO: Config whether this is enabled or not
-		startSendSchematic(player);
+		if(ModSchematicBuilder.configGeneral.acceptSendSchematic)
+			startSendSchematic(player);
 	}
 	
 	//Send progress update to all who have requested it
@@ -1644,49 +1679,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			buildZ = zCoord - 1;
 		}
 	}
-	
-	
-	public static File getSaveFolderServer() {
-		File saveFolder = new File(DimensionManager.getCurrentSaveRootDirectory(), "schematics");
-		if(!saveFolder.exists())
-			saveFolder.mkdirs();
-		return saveFolder;
-	}
-	
-	@SideOnly(Side.CLIENT)
-	public static File getSaveFolderClient() {
-		File mcHome = (File)FMLInjectionData.data()[6]; //TODO: Find a cleaner way
-		File saveFolder = new File(mcHome, "saves/SchematicBuilder/local"); //TODO: Per server local cache
-		if(!saveFolder.exists())
-			saveFolder.mkdirs();
-		return saveFolder;
-	}
-	
-	@SideOnly(Side.CLIENT)
-	public static File getLoadFolderClient() {
-		File mcHome = (File)FMLInjectionData.data()[6]; //TODO: Find a cleaner way
-		File loadFolder = new File(mcHome, "schematics");
-		if(!loadFolder.exists())
-			loadFolder.mkdirs();
-		return loadFolder;
-	}
-	
-	@SideOnly(Side.CLIENT)
-	public static File getCacheFolderClient() {
-		File mcHome = (File)FMLInjectionData.data()[6]; //TODO: Find a cleaner way
-		
-		ServerData serverData = Minecraft.getMinecraft().func_147104_D();
-		String server;
-		if(serverData == null)
-			server = "local";
-		else
-			server = serverData.serverIP;
-		
-		File cacheFolder = new File(mcHome, "schematicsCache/" + server);
-		if(!cacheFolder.exists())
-			cacheFolder.mkdirs();
-		return cacheFolder;
-	}
 
 	public boolean saveLoadedSchematic() {
 		if(loadedSchematic == null)
@@ -1696,7 +1688,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		if(uploader != null)
 			uploadedBy = uploader.getDisplayName();
 		
-		File saveFolder = getSaveFolderServer();
+		File saveFolder = StorageDirectories.getSaveFolderServer();
 		File schematicFile;
 		try {
 			schematicFile = File.createTempFile("upload_" + uploadedBy + "_", loadedSchematic.name + ".schematic", saveFolder);
@@ -1726,7 +1718,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		if(cachedSchematicFile.isEmpty())
 			return false;
 		
-		File saveFolder = getSaveFolderServer();
+		File saveFolder = StorageDirectories.getSaveFolderServer();
 		File schematicFile = new File(saveFolder, cachedSchematicFile);
 		
 		if(!schematicFile.exists())
@@ -1766,7 +1758,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 			Block block = Block.getBlockById(blockId);
 			if(block == null)
 			{
-				if(debug)
+				if(ModSchematicBuilder.debug)
 				{
 					ModLog.printTileInfoPrefix(this);
 					ModLog.logger.warn("Could not find block for blockId: " + blockId);
@@ -1774,10 +1766,11 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 				continue;
 			}
 			
-			ResourceItem item = new ResourceItem(block, meta);
+			ResourceEntry resourceEntry = ModSchematicBuilder.resourceManager.getOrCreate(Block.blockRegistry.getNameForObject(block), meta);
+			ResourceItem item = new ResourceItem(resourceEntry);
 			item.blockCount = count;
-			//TODO: Load cost from config and determine missing resources
-			//Number of items already loaded and used are read from Tile NBT
+			item.placedCount = 0;
+			item.storedItemCount = 0;
 			resources.put(blockIndex, item);
 		}
 	}
@@ -1794,6 +1787,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	
 	@Override
 	public void invalidate() {
+		ModSchematicBuilder.configGeneral.removeConfigListener(this);
+		
 		if(worldObj.isRemote)
 			return;
 		
@@ -1870,7 +1865,29 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 				state = prevState;
 		}
 		
-		//TODO: Read resource list
+		//Read resources
+		NBTTagList nbtResources = nbt.getTagList("resourceList", Constants.NBT.TAG_COMPOUND);
+		for(int t = 0; t < nbtResources.tagCount(); t++)
+		{
+			NBTTagCompound tag = nbtResources.getCompoundTagAt(t);
+			
+			String blockName = tag.getString("blockName");
+			if(blockName.isEmpty())
+				continue;
+			
+			byte meta = tag.getByte("meta");
+			
+			ResourceEntry resourceEntry = ModSchematicBuilder.resourceManager.getOrCreate(blockName, meta);
+			
+			ResourceItem item = new ResourceItem(resourceEntry);
+			item.blockCount = tag.getInteger("count");
+			item.placedCount = tag.getInteger("placed");
+			item.storedItemCount = tag.getInteger("stored");
+			//TODO: Verify that all values are sane(Placed < count etc.)
+			
+			short resourceIndex = (short) ((blockRegistry.getId(resourceEntry.block) << 4) | (meta & 0xF));
+			resources.put(resourceIndex, item);
+		}
     }
 
 	@Override
@@ -1897,7 +1914,22 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 		
 		config.writeToNBT(nbt);
 		
-		//TODO: Write resource list with resource name, resource needed and resources remaining
+		NBTTagList nbtResources = new NBTTagList();
+		for(ResourceItem item : resources.values())
+		{
+			if(item == null)
+				continue;
+			NBTTagCompound tag = new NBTTagCompound();
+
+			tag.setString("blockName", blockRegistry.getNameForObject(item.getBlock()));
+			tag.setByte("meta", item.getMeta());
+			tag.setInteger("placed", item.placedCount);
+			tag.setInteger("count", item.blockCount);
+			tag.setInteger("stored", item.storedItemCount);
+			
+			nbtResources.appendTag(tag);
+		}
+		nbt.setTag("resourceList", nbtResources);
 
     }
 
@@ -1927,6 +1959,18 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, co
 	@Override
 	public int getMaxEnergyStored(ForgeDirection from) {
 		return energyStorage.getMaxEnergyStored();
+	}
+
+	@Override
+	public void onConfigReload(ConfigurationManager configManager) {
+		if(!ModSchematicBuilder.useEnergy)
+			return;
+		
+		ModSchematicBuilder mod = ModSchematicBuilder.instance;
+		energyStorage.setCapacity(mod.configGeneral.builderMaxEnergy);
+		energyCostNOP = mod.configGeneral.builderEnergyCostNOP;
+		energyCostPlace = mod.configGeneral.builderEnergyCostPlace;
+		energyModifierPass2 = mod.configGeneral.builderEnergyModifierPass2;
 	}
 	
 }

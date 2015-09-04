@@ -402,8 +402,8 @@ public class WorldSchematicVisualizer {
 						if(block == null)
 							continue;
 
-						Block realBlock = block.getBlock();
-						if(realBlock.getMaterial() == Material.air)
+						Block realBlock = block.getServerBlock(schematic);
+						if(realBlock == null || realBlock.getMaterial() == Material.air)
 							continue;
 
 						int worldY = y;
@@ -421,7 +421,7 @@ public class WorldSchematicVisualizer {
 						Block worldBlock = vTile.getWorldObj().getBlock(vTile.buildX+x, vTile.yCoord+(y+1), (vTile.buildZ+1)+z);
 						if(worldBlock != Blocks.air)
 							continue;
-						renderBlocksRi.renderBlockByRenderType(vTile.config.floorBlock.getBlock(), x, y, z);
+						renderBlocksRi.renderBlockByRenderType((Block)Block.blockRegistry.getObjectById(vTile.config.floorBlock.getOriginalBlockId()), x, y, z);
 					}
 				}
 			}
