@@ -23,10 +23,12 @@ public class Networking {
 		//When removing an old message, replace it with a call to getFreeId().
 		channel.registerMessage(MessageUploadSchematic.Handler.class, MessageUploadSchematic.class, getFreeId(), Side.SERVER);
 		channel.registerMessage(MessageActionSchematicBuilder.Handler.class, MessageActionSchematicBuilder.class, getFreeId(), Side.SERVER);
+		channel.registerMessage(MessageConfigUpdate.class, MessageConfigUpdate.class, getFreeId(), Side.SERVER);
 		
 		channel.registerMessage(MessageUpdateSchematicBuilder.Handler.class, MessageUpdateSchematicBuilder.class, getFreeId(), Side.CLIENT);
 		channel.registerMessage(MessageUploadSchematic.Handler.class, MessageUploadSchematic.class, getFreeId(), Side.CLIENT);
 		channel.registerMessage(MessageUpdateProgress.Handler.class, MessageUpdateProgress.class, getFreeId(), Side.CLIENT);
+		channel.registerMessage(MessageConfigUpdate.class, MessageConfigUpdate.class, getFreeId(), Side.CLIENT);
 		
 		//Release 2
 		//Release 3

@@ -46,6 +46,7 @@ public class ModSchematicBuilder implements IConfigListener{
 	public static CommonProxy proxy;
 	
 	public static SchematicLoaderService schematicLoaderService;
+	public static PlayerManager playerManager;
 	
 	public GuiHandler guiHandler;
 	public static boolean useEnergy;
@@ -75,6 +76,7 @@ public class ModSchematicBuilder implements IConfigListener{
     	if(configGeneral.loaderThreadCount < 1)
     		configGeneral.loaderThreadCount = 1;
     	schematicLoaderService = new SchematicLoaderService(configGeneral.loaderThreadCount);
+    	playerManager = new PlayerManager();
     	
     	ModCheck modCheckCoFHAPI = new ModCheckCoFHAPI();
     	if(configGeneral.energyEnabled)
@@ -103,6 +105,7 @@ public class ModSchematicBuilder implements IConfigListener{
     	
     	//Events
     	FMLCommonHandler.instance().bus().register(new TickHandler());
+    	FMLCommonHandler.instance().bus().register(playerManager);
     	
     	//Recipe
     	GameRegistry.addRecipe(new ItemStack(BlockLibrary.schematicBuilder), new Object[] {

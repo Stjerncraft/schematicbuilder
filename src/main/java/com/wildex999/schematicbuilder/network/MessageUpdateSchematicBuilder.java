@@ -114,7 +114,6 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	@Override
 	public void fromBytes(ByteBuf buf) {
 		tileInfo = readTileEntity(buf);
-		
 		updateType = UpdateType.fromValue(buf.readInt());
 		switch(updateType) {
 		case CONFIG:

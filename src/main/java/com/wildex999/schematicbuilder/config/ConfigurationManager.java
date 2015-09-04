@@ -1,5 +1,7 @@
 package com.wildex999.schematicbuilder.config;
 
+import io.netty.buffer.ByteBuf;
+
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -7,8 +9,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
 
+import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.utils.ModLog;
 
+import cpw.mods.fml.common.network.ByteBufUtils;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 
@@ -20,6 +24,7 @@ public abstract class ConfigurationManager {
 		public String name;
 		public String comment;
 		public boolean canReload;
+		public boolean sendToClient;
 		public ConfigEntryType type;
 	}
 	protected HashMap<Field, ConfigEntryStored> configEntries;
@@ -57,6 +62,7 @@ public abstract class ConfigurationManager {
 				storedEntry.category = entry.category();
 				storedEntry.comment = entry.comment();
 				storedEntry.canReload = entry.canReload();
+				storedEntry.sendToClient = entry.sendToClient();
 				
 				if(entry.type() == ConfigEntryType.UNKNOWN)
 					storedEntry.type = ConfigEntryType.typeOf(field);
@@ -113,6 +119,24 @@ public abstract class ConfigurationManager {
 					break;
 				}
 			} catch (Exception e) {
+				ModLog.logger.error("Failed to read config entry: " + configEntry.category + "." + configEntry.name);
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	
+	//Write the changed values into the config
+	protected void writeConfigEntries() {
+		for(Entry<Field, ConfigEntryStored> entry : configEntries.entrySet())
+		{
+			Field field = entry.getKey();
+			ConfigEntryStored configEntry = entry.getValue();
+			
+			try {
+				Property prop = config.get(configEntry.category, configEntry.name, String.valueOf(field.get(this)), configEntry.comment, configEntry.type.getConfigType());
+				prop.setValue(String.valueOf(field.get(this)));
+			} catch (Exception e) {
 				ModLog.logger.error("Failed to write config entry: " + configEntry.category + "." + configEntry.name);
 				e.printStackTrace();
 			}
@@ -120,8 +144,10 @@ public abstract class ConfigurationManager {
 	}
 	
 	//Reload values from config file
-	public void reload() {
-		config = new Configuration(configFile);
+	//fromFile: Whether to read changes from file
+	public void reload(boolean fromFile) {
+		if(fromFile)
+			config = new Configuration(configFile);
 		onReload();
 		notifyListenersReload();
 	}
@@ -134,11 +160,98 @@ public abstract class ConfigurationManager {
 	public void saveConfig(boolean now) {
 		if(now)
 		{
+			writeConfigEntries();
 			config.save();
 			markedForSave = false;
 		}
 		else
 			markedForSave = true;
+	}
+	
+	//Serialization
+	//Write the annotated fields
+	public void toBytes(ByteBuf buf) throws Exception {
+		buf.writeInt(configEntries.size());
+		for(Entry<Field, ConfigEntryStored> entry : configEntries.entrySet())
+		{
+			Field field = entry.getKey();
+			ConfigEntryStored configEntry = entry.getValue();
+			
+			if(!configEntry.sendToClient)
+				continue;
+			
+			ByteBufUtils.writeUTF8String(buf, field.getName());
+			buf.writeInt(configEntry.type.getValue());
+			
+			switch(configEntry.type)
+			{
+			case UNKNOWN:
+				if(ModSchematicBuilder.debug)
+					ModLog.logger.error("Unable to serialize config option: " + field.getName() + " for sending over network! Unknown data type!");
+				break;
+			case BYTE:
+				buf.writeByte(field.getByte(this));
+				break;
+			case SHORT:
+				buf.writeShort(field.getShort(this));
+				break;
+			case INT:
+				buf.writeInt(field.getInt(this));
+				break;
+			case FLOAT:
+				buf.writeFloat(field.getFloat(this));
+				break;
+			case DOUBLE:
+				buf.writeDouble(field.getDouble(this));
+				break;
+			case BOOLEAN:
+				buf.writeBoolean(field.getBoolean(this));
+				break;
+			case STRING:
+				ByteBufUtils.writeUTF8String(buf, (String)field.get(this));
+				break;
+			}
+		}
+	}
+	
+	//Read the annotated fields
+	public void fromBytes(ByteBuf buf) throws Exception {
+		int count = buf.readInt();
+		for(int i=0; i<count; i++)
+		{
+			String fieldName = ByteBufUtils.readUTF8String(buf);
+			ConfigEntryType type = ConfigEntryType.fromValue(buf.readInt());
+			
+			Field field = this.getClass().getField(fieldName);
+			switch(type)
+			{
+			case UNKNOWN:
+				if(ModSchematicBuilder.debug)
+					ModLog.logger.error("Unable to deserialize config option: " + field.getName() + " from network! Unknown data type!");
+				break;
+			case BYTE:
+				field.setByte(this, buf.readByte());
+				break;
+			case SHORT:
+				field.setShort(this, buf.readShort());
+				break;
+			case INT:
+				field.setInt(this, buf.readInt());
+				break;
+			case FLOAT:
+				field.setFloat(this, buf.readFloat());
+				break;
+			case DOUBLE:
+				field.setDouble(this, buf.readDouble());
+				break;
+			case BOOLEAN:
+				field.setBoolean(this, buf.readBoolean());
+				break;
+			case STRING:
+				field.set(this, ByteBufUtils.readUTF8String(buf));
+				break;
+			}
+		}
 	}
 	
 	//Notify all listeners of a reload

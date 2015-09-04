@@ -213,7 +213,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	
 	private int currentPass; //Multiple passes are required for some blocks
 	
-	private int maxSchematicBytes = 10485760;
 	private int uploadTimeoutTicks = 200; //How many ticks since last data message before it fails
 	private int lastUploadTicks = 0; //Ticks since last data message while receiving upload
 	
@@ -459,6 +458,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			return;
 		}
 		byte[] sendData = byteStream.toByteArray();
+		
+		if(sendData.length > ModSchematicBuilder.configGeneral.maxSendSizeBytes)
+			return;
 		
 		for(EntityPlayerMP pl : players)
 		{
@@ -722,9 +724,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 					lastY = chunkY*chunkSize;
 					if(config.placeFloor && lastY == 0)
 						lastY = -1;
-					
-					//TODO: Fix it building outside Schematic once reaching end chunk layer and before moving to the next
-					//Fixed by setting chunkZ >= ?
 				}
 				else
 				{ //End of Build
@@ -1268,14 +1267,14 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			return;
 		}
 		
-		if(size < 0 || size > maxSchematicBytes)
+		if(size < 0 || size > ModSchematicBuilder.configGeneral.maxUploadSizeBytes)
 		{
 			if(ModSchematicBuilder.debug)
 			{
 				ModLog.printTileInfoPrefix(this);
 				System.out.println("Start upload failed due to file size(" + size + " bytes) from player: " + uploader.getDisplayName());
 			}
-			serverStateError("Upload failed due to illegal size: " + size + " bytes. Server max: " + maxSchematicBytes + " bytes.", true);
+			serverStateError("Upload failed due to illegal size: " + size + " bytes. Server max: " + ModSchematicBuilder.configGeneral.maxUploadSizeBytes + " bytes.", true);
 			return;
 		}
 		if(ModSchematicBuilder.debug)
@@ -1401,7 +1400,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	
 	@SideOnly(Side.CLIENT)
 	public void networkOnDownloadStart(int size) {
-		if(size > maxSchematicBytes || size <= 0)
+		if(size > ModSchematicBuilder.configGeneral.maxSendSizeBytes || size <= 0)
 			return;
 		
 		downloadComplete = false;

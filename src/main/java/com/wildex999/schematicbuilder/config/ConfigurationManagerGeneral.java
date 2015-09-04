@@ -23,6 +23,10 @@ public class ConfigurationManagerGeneral extends ConfigurationManager {
 	
 	@ConfigEntry(name="acceptUploadSchematic", comment="Whether or not Clients can upload their own Schematics to the server")
 	public boolean acceptUploadSchematic = true;
+	@ConfigEntry(name="maxUploadSizeBytes", comment="The max size in bytes of a Schematic that a player can upload")
+	public int maxUploadSizeBytes = 10485760;
+	@ConfigEntry(name="maxSendSizeBytes", sendToClient=false, comment="The max size in bytes of a Schematic that the server will send to player/client will accept from server")
+	public int maxSendSizeBytes = 10485760;
 	@ConfigEntry(name="acceptSendSchematic", comment="Whether or not the Server will send Schematics to clients, allowing for preview and Visualization.")
 	public boolean acceptSendSchematic = true;
 	@ConfigEntry(name="transferPacketSize", comment="How many bytes of data that will transfer per tick. This is for transfer between Server and Client, and is per transfer operation.")
@@ -51,6 +55,13 @@ public class ConfigurationManagerGeneral extends ConfigurationManager {
 	public int builderEnergyCostPlace = 50;
 	@ConfigEntry(category=ConfigCategory.BUILDER, name="energyModifierPass2", comment="Modifier for the energy cost of both Nop and Build for pass 2")
 	public float builderEnergyModifierPass2 = 0.5f;
+	
+	@ConfigEntry(category=ConfigCategory.BUILDER, name="schematicMaxWidth", comment="The size width of a Schematic that the Builder is allowed to load")
+	public int builderMaxWidth = 1000;
+	@ConfigEntry(category=ConfigCategory.BUILDER, name="schematicMaxLength")
+	public int builderMaxLength = 1000;
+	@ConfigEntry(category=ConfigCategory.BUILDER, name="schematicMaxHeight")
+	public int builderMaxHeight = 255;
 	
 	@Override
 	protected void setupDefaults() {
