@@ -171,7 +171,16 @@ public abstract class ConfigurationManager {
 	//Serialization
 	//Write the annotated fields
 	public void toBytes(ByteBuf buf) throws Exception {
-		buf.writeInt(configEntries.size());
+		
+		//Count number of entries to send, excluding those marked to not send
+		int count = 0;
+		for(ConfigEntryStored entry : configEntries.values())
+		{
+			if(!entry.sendToClient)
+				count++;
+		}
+		
+		buf.writeInt(count);
 		for(Entry<Field, ConfigEntryStored> entry : configEntries.entrySet())
 		{
 			Field field = entry.getKey();

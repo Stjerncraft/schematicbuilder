@@ -28,6 +28,8 @@ import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import cpw.mods.fml.common.event.FMLServerStoppingEvent;
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 
@@ -116,6 +118,13 @@ public class ModSchematicBuilder implements IConfigListener{
     	});
     	
     	ModLog.logger.info("Schematic Builder initialized!");
+    }
+    
+    @SubscribeEvent
+    public void onServerShutdown(FMLServerStoppingEvent event)  {
+    	ModLog.logger.info("SchematicBuilder shutting down...");
+    	configGeneral.saveConfig(true);
+    	ModLog.logger.info("Done!");
     }
 
 	@Override
