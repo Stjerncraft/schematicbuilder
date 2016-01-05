@@ -14,7 +14,7 @@ public class ContainerSchematicBuilder extends Container {
 	protected static int slotsPerRow = 9;
 	protected static int slotSize = 18;
 	
-	private int playerInventoryIndex = 0; //Start index of player inventory
+	private int playerInventoryIndex = 0;
 	private int playerInventoryX = 0;
 	private int playerInventoryY = 0;
 	
@@ -27,7 +27,7 @@ public class ContainerSchematicBuilder extends Container {
 		this.playerInventory = playerInventory;
 		
 		initPlayerInventory(playerInventory, 6, 172);
-		initContainerInventory(tile.getInventory(), 8, 158);
+		initContainerInventory(tile.getInventory(), 6, 155);
 		
 		if(tile instanceof IGuiWatchers)
 			((IGuiWatchers)tile).addWatcher(playerInventory.player);
@@ -45,7 +45,7 @@ public class ContainerSchematicBuilder extends Container {
 	protected void initPlayerInventory(InventoryPlayer inventory, int playerInventoryX, int playerInventoryY) {
 		int i;
 		
-		playerInventoryIndex = this.inventorySlots.size();
+		this.playerInventoryIndex = this.inventorySlots.size();
 		this.playerInventoryX = playerInventoryX;
 		this.playerInventoryY = playerInventoryY;
 		
@@ -61,7 +61,8 @@ public class ContainerSchematicBuilder extends Container {
 	
 	//Initialize the Container inventory
 	protected void initContainerInventory(IInventory inventory, int invX, int invY) {
-		this.addSlotToContainer(new Slot(inventory, 0, invX, invY));
+		this.addSlotToContainer(new Slot(inventory, tile.inventorySlotGround, invX, invY)); //Ground
+		this.addSlotToContainer(new Slot(inventory, tile.inventorySlotSwap, invX, invY-30)); //Swap
 	}
 	
 	public void setPlayerInventoryPosition(int x, int y) {

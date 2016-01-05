@@ -21,9 +21,10 @@ import net.minecraft.nbt.NBTTagCompound;
 
 
 public class Schematic {
+	public static int currentSerializedVersion = 1; //Increase whenever there are breaking changes to the serialization format
+	public static int blockIdAir = 0; //TODO: Actually get the BlockId of air. TODO: Allow mapping of air to another block(Change id)
 	
-	public static int blockIdAir = 0; //TODO: Actually get the BlockId of air
-	public int serializedVersion = 1; //Used to handle backwards compatibility for server saved Schematics
+	public int serializedVersion = currentSerializedVersion; //Used to handle backwards compatibility for server saved Schematics
 	public String name;
 	public String author;
 	
@@ -138,9 +139,9 @@ public class Schematic {
 	//Add a mapping from Schematic Block Id to Server Block Id
 	public SchematicMap addSchematicMap(short originalBlockId, byte originalMeta, String originalName, short blockId, byte meta) {
 		SchematicMap map = new SchematicMap();
-		map.originalBlockId = originalBlockId;
-		map.originalMeta = originalMeta;
-		map.originalName = originalName;
+		map.schematicBlockId = originalBlockId;
+		map.schematicMeta = originalMeta;
+		map.schematicBlockName = originalName;
 		map.blockId = blockId;
 		map.meta = meta;
 		
@@ -150,10 +151,10 @@ public class Schematic {
 	
 	//Get the mapping for the given Schematic Block ID
 	//canIgnoreMeta: If true, it will return the entry for meta=0 if no entry exists for the given meta
-	public SchematicMap getSchematicMap(short originalBlockId, byte meta, boolean canIgnoreMeta) {
-		SchematicMap map = schematicMap.get((originalBlockId << 4) | meta);
-		if(canIgnoreMeta && map == null && meta != 0)
-			map = schematicMap.get(originalBlockId << 4);
+	public SchematicMap getSchematicMap(short schematicBlockId, byte schematicMeta, boolean canIgnoreMeta) {
+		SchematicMap map = schematicMap.get((schematicBlockId << 4) | schematicMeta);
+		if(canIgnoreMeta && map == null && schematicMeta != 0)
+			map = schematicMap.get(schematicBlockId << 4);
 		
 		return map;
 	}
@@ -208,8 +209,8 @@ public class Schematic {
 								
 								//As of writing this, the max BlockID is 4096, so it fit into 12 bits.
 								//MetaData is 4 bits, so we can pack both into 16 bits.
-								short data = (short) (block.getOriginalBlockId() << 4);
-								data |= (short)(block.getOriginalMeta() & 0xF);
+								short data = (short) (block.getSchematicBlockId() << 4);
+								data |= (short)(block.getSchematicMeta() & 0xF);
 								buf.writeShort(data);
 							}
 						}
@@ -227,7 +228,7 @@ public class Schematic {
 		//Write Entities
 	}
 	
-	public static Schematic fromBytes(ByteBuf buf, HashMap<Short, MutableInt> blockCount) {
+	public static Schematic fromBytes(ByteBuf buf, HashMap<Short, MutableInt> blockCount) throws Exception {
 		Schematic newSchematic;
 		FMLControlledNamespacedRegistry<Block> BlockRegistry = GameData.getBlockRegistry();
 		
@@ -250,6 +251,9 @@ public class Schematic {
 		int chunkSize = newSchematic.chunkSize;
 		
 		//TODO: Handle loading old serialized Schematic versions
+		if(serializedVersion != currentSerializedVersion)
+			throw new Exception("Version incompatibility between Schematic serialization versions."
+					+ "\nExpected: " + currentSerializedVersion + ", got: " + serializedVersion);
 		
 		//Read Schematic Map
 		int mapCount = buf.readInt();
@@ -257,7 +261,7 @@ public class Schematic {
 		{
 			SchematicMap map = new SchematicMap();
 			map.fromBytes(buf);
-			newSchematic.schematicMap.put((map.originalBlockId << 4) | map.originalMeta, map);
+			newSchematic.schematicMap.put((map.schematicBlockId << 4) | map.schematicMeta, map);
 		}
 		
 		//Read Chunks
@@ -291,7 +295,7 @@ public class Schematic {
 								if(blockCount != null && blockId != blockIdAir )
 								{
 									if(blockId >= SchematicLoader.maxBlockId && ModSchematicBuilder.debug)
-										System.out.println("Over block id for block: " + blockId);
+										throw new Exception("Got block with block ID: " + blockId + ", above maximum: " + SchematicLoader.maxBlockId);
 									
 									short index = (short) ((blockId << 4) | meta);
 									MutableInt count = blockCount.get(index);

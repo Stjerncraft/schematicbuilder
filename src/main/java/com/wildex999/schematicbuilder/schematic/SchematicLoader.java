@@ -11,6 +11,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 
+import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.exceptions.ExceptionInvalid;
@@ -168,9 +169,16 @@ public class SchematicLoader {
         if(tagCompound.hasKey(NBT_MAPPING_SCHEMATICA)) {
         	NBTTagCompound mapping = tagCompound.getCompoundTag(NBT_MAPPING_SCHEMATICA);
         	Set<String> names = mapping.func_150296_c();
+
+        	if(ModSchematicBuilder.debug)
+        		ModLog.logger.info("Loading name mapping: ");
+        	
         	for(String name : names) {
         		int schematicBlockId = mapping.getInteger(name);
         		int serverBlockId = BlockRegistry.getId(name);
+        		
+        		if(ModSchematicBuilder.debug)
+        			ModLog.logger.info("Name Map(Schematic -> Server): " + name + ": " + schematicBlockId + " -> " + serverBlockId);
         		
         		schematic.addSchematicMap((short)schematicBlockId, (byte)0, name, (short)serverBlockId, (byte)0);
         		nameMap.put(schematicBlockId, name);
@@ -197,21 +205,33 @@ public class SchematicLoader {
         			SchematicMap map = schematic.getSchematicMap((short) blockID, meta, false);
         			if(map == null)
         			{
-        				Block block = BlockRegistry.getObjectById(blockID);
-        				short serverBlockId;
-        				if(block != null)
-        					serverBlockId = (short)blockID;
+        				//Try to get Base block id and copy that
+        				map = schematic.getSchematicMap((short) blockID,  meta, true);
+        				if(map == null)
+        				{
+	        				Block block = BlockRegistry.getRaw(blockID); //Raw will return null if not found(Instead of default)
+	        				short serverBlockId;
+	        				String blockName = null;
+	        				if(block != null)
+	        				{
+	        					serverBlockId = (short)blockID;
+	        					blockName = BlockRegistry.getNameForObject(block);
+	        				}
+	        				else
+	        					serverBlockId = -1;
+	        				map = schematic.addSchematicMap((short) blockID, meta, nameMap.size() > 0 ? nameMap.get(blockID) : blockName, serverBlockId, meta);
+        				}
         				else
-        					serverBlockId = -1;
-        				map = schematic.addSchematicMap((short) blockID, meta, nameMap.size() > 0 ? nameMap.get(blockID) : null, serverBlockId, meta);
+        					map = schematic.addSchematicMap((short) blockID, meta, map.schematicBlockName, map.blockId, meta);
         			}
         			
         			schematic.setBlock(x, y, z, (short) blockID, meta);
         			
-					if(blockCount != null && blockID != schematic.blockIdAir)
+					if(blockCount != null)
 					{
-						if(blockID >= SchematicLoader.maxBlockId)
-							System.out.println("Over block id for block: " + blockID);
+						if(blockID < 0 || blockID >= SchematicLoader.maxBlockId)
+			        		throw new ExceptionInvalid("Invalid block ID: " + blockID + ", is above max Block ID: " + SchematicLoader.maxBlockId +
+			        				". Schematic might be invalid!");
 						
 						short blockIndex = (short) ((blockID << 4) | meta);
 						MutableInt count = blockCount.get(blockIndex);
@@ -267,7 +287,7 @@ public class SchematicLoader {
 					if(sBlock == null)
 						sBlock = airBlock;
 					
-					int blockId = sBlock.getOriginalBlockId();
+					int blockId = sBlock.getSchematicBlockId();
 					
 					blocks[index] = (byte) (blockId & 0xFF);
 					if(blockId > 255)
@@ -276,13 +296,15 @@ public class SchematicLoader {
 						extra[index/2] |= (byte) ((blockId >> 8) << (part*4));
 					}
 					//meta[index/2] |= sBlock.metaData << (part*4);
-					meta[index] = sBlock.getOriginalMeta(); //Currently uses a full byte instead of compressing down to 4 bits
+					meta[index] = sBlock.getSchematicMeta(); //Currently uses a full byte instead of compressing down to 4 bits
 					
 					if(mapping[blockId] == null)
 					{
-						SchematicMap map = schematic.getSchematicMap((short) sBlock.getOriginalBlockId(), sBlock.getOriginalMeta(), false);
-						if(map == null || map.originalName == null)
+						SchematicMap map = schematic.getSchematicMap(sBlock.getSchematicBlockId(), sBlock.getSchematicMeta(), true);
+						if(map == null || map.schematicBlockName == null)
 							mapping[blockId] = "";
+						else
+							mapping[blockId] = map.schematicBlockName;
 					}
 				}
 			}

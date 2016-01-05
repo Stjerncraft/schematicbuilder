@@ -19,6 +19,7 @@ import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
@@ -43,7 +44,7 @@ public class GuiSchematicBuilder implements IGuiHandler
 		return new GUI(player, (TileSchematicBuilder)tile);
 	}
 
-	public static class GUI extends GuiContainer {
+	public static class GUI extends GuiContainer implements IGuiModalHandler {
 	
 		public static final ResourceLocation textureTabs = new ResourceLocation(ModSchematicBuilder.MODID, "textures/gui/schematic_tabs.png");
 		
@@ -56,10 +57,10 @@ public class GuiSchematicBuilder implements IGuiHandler
 		public ContainerSchematicBuilder container;
 		public boolean ignoreKeyboardEvent;
 		
-		public int colorText = 4210752;
-		public int colorOk = 0x47D147;
-		public int colorError = 0xFF6600;
-		public int colorWhite = 0xFFFFFFFF;
+		public static int colorText = 4210752;
+		public static int colorOk = 0x47D147;
+		public static int colorError = 0xFF6600;
+		public static int colorWhite = 0xFFFFFFFF;
 		
 		public int tabIdMain;
 		public int tabIdLocal;
@@ -68,6 +69,8 @@ public class GuiSchematicBuilder implements IGuiHandler
 		private GuiButtonCustom tabMain;
 		private GuiButtonCustom tabLocal;
 		private GuiButtonCustom tabResources;
+		
+		private IGuiModal modalGui; //Currently open Modal GUI
 		
 		//Tabs
 		private ArrayList<IGuiTabEntry> tabs = new ArrayList<IGuiTabEntry>();
@@ -256,6 +259,29 @@ public class GuiSchematicBuilder implements IGuiHandler
 		//Update the GUI based on state
 		public void updateGui() {
 			tabs.get(currentTab).updateGui();
+		}
+
+		@Override
+		public void showModal(IGuiModal gui) {
+			if(modalGui != null)
+				closeModal();
+			if(gui == null)
+				return;
+			
+			modalGui = gui;
+			Minecraft.getMinecraft().currentScreen = modalGui.getGui();
+			modalGui.onOpen(this, this.mc, this.width, this.height);
+		}
+
+		@Override
+		public void closeModal() {
+			if(modalGui == null)
+				return;
+			
+			modalGui.onClose();
+			Minecraft.getMinecraft().currentScreen = this;
+			modalGui = null;
+			updateGui(); //Make sure the GUI is up to date, and allow them to pick up changes from the modal
 		}
 		
 	}

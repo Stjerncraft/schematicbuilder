@@ -4,10 +4,16 @@ import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.schematicbuilder.config.IConfigListener;
 
 import net.minecraft.block.Block;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 public class ResourceEntry implements IConfigListener {
+	
+	public static ResourceEntry Unknown = new ResourceEntry(Blocks.air, (byte) 0); //No known Server equivalent for Block
+	public static ResourceEntry Banned = new ResourceEntry(Blocks.air, (byte) 0); //The chosen entry is banned on this server(TODO: Implement banning of blocks/items)
+	
+	//The server BlockId and Meta
 	public Block block;
 	public byte meta;
 	
@@ -37,7 +43,7 @@ public class ResourceEntry implements IConfigListener {
 		valid = true;
 	}
 	
-	//Constructor for loading Item and cost from config
+	//Constructor when item and cost is known
 	public ResourceEntry(Block block, byte meta, ItemStack item, float itemCostPerBlock) {
 		this.block = block;
 		this.item = item;

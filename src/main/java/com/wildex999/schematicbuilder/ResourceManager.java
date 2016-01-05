@@ -14,7 +14,7 @@ public class ResourceManager implements IConfigListener{
 	
 	public ResourceManager() {
 		resourceMap = new HashMap<String, ResourceEntry>();
-		//TODO: Get ConfigurationManagerResource and load inn known all entries
+		//TODO: Get ConfigurationManagerResource and load in known all entries
 		//TODO: Save to Config any local changes/new entries
 	}
 	
@@ -36,25 +36,47 @@ public class ResourceManager implements IConfigListener{
 	
 	public ResourceEntry getOrCreate(String blockName, byte meta)
 	{
+		if(blockName == null || blockName.isEmpty())
+			return ResourceEntry.Unknown;
+		
 		ResourceEntry entry = getEntry(blockName, meta);
 		if(entry == null)
 		{
 			Block block = (Block) Block.blockRegistry.getObject(blockName);
-			entry = new ResourceEntry(block, meta);
+			if(block != null)
+				entry = new ResourceEntry(block, meta);
+			else
+				entry = ResourceEntry.Unknown;
+				
 			setEntry(blockName, meta, entry);
 		}
 		return entry;
 	}
 	
 	//Get the Resource Entry for the given block and metadata
+	//Returns null if no entry matching entry exists
 	public ResourceEntry getEntry(String blockName, byte meta)
 	{
 		return resourceMap.get(blockName+"_"+meta);
 	}
 	
 	//Get the Resource Entry for the given block and metadata
+	//Returns null if no entry matching entry exists
 	public ResourceEntry getEntry(Block block, byte meta) {
 		return getEntry(Block.blockRegistry.getNameForObject(block), meta);
+	}
+	
+	//Set the resource for the given resource map, using the schematic block id and meta inside the given resource as key
+	public static void setResource(HashMap<Short, ResourceItem> resourceMap, ResourceItem resource) {
+		short resourceIndex = (short) ((resource.getSchematicBlockId() << 4) | (resource.getSchematicMeta() & 0xF));
+		resourceMap.put(resourceIndex, resource);
+	}
+	
+	//Returns the resource for the given schematic block id and meta, using them as key.
+	//Returns null if no resource exists for the given combination
+	public static ResourceItem getResource(HashMap<Short, ResourceItem> resourceMap, short schematicBlockId, byte schematicMeta) {
+		short resourceIndex = (short) ((schematicBlockId << 4) | (schematicMeta & 0xF));
+		return resourceMap.get(resourceIndex);
 	}
 	
 	@Override

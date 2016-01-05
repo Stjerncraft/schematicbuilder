@@ -57,8 +57,10 @@ import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder.Acti
 import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
 import com.wildex999.schematicbuilder.schematic.SchematicLoader;
+import com.wildex999.schematicbuilder.schematic.SchematicMap;
 import com.wildex999.schematicbuilder.tiles.BuilderState;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
+import com.wildex999.utils.ModLog;
 
 import cpw.mods.fml.client.config.GuiButtonExt;
 
@@ -77,7 +79,19 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	private GuiList resourceList;
 	private GuiButtonStretched buttonScrollbar;
 	
+	private GuiButton buttonAll; //Show all Resources
+	private GuiButton buttonMissing; //Show Resources missing
+	private GuiButton buttonUnknown; //Show Resources Unknown
+	private GuiButton buttonBanned; //Show Resources Banned
+	
+	//Floor Item
+	private GuiLabel labelFloor;
+	private GuiLabel labelFloorMissing;
+	private GuiLabel labelFloorStored;
+	private GuiLabel labelFloorPlaced;
+	
 	private GuiButtonItem buttonFloorItem;
+	private boolean selectingFloorItem; //True when currently selecting new Floor item
 	
 	private GuiSchematicBuilder.GUI gui;
 	
@@ -92,17 +106,13 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		
 		resourceList = new GuiList(this, 168, 5, 76, 244);
 		resourceList.entryHeight = 26;
+		
+		selectingFloorItem = false;
 	}
 	
 	
 	@Override
-	public void onTabActivated() {
-		//Set Floor
-		if(gui.tile.config.floorBlock != null)
-			buttonFloorItem.setItem(new ItemStack((Block) Block.blockRegistry.getObjectById(gui.tile.config.floorBlock.getOriginalBlockId()), 1, gui.tile.config.floorBlock.getOriginalMeta()));
-		else
-			buttonFloorItem.setItem(null);
-		
+	public void onTabActivated() {		
 		//Populate Resource List
 		if(gui.tile.loadedSchematic != null && gui.tile.resources != null)
 		{
@@ -110,10 +120,28 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 			{
 				ResourceItem resource = entry.getValue();
 				GuiListEntryResource listEntry;
-				if(resource.getItem() != null)
-					listEntry = new GuiListEntryResource(resource.getItem().getDisplayName()+"("+resource.getMeta()+")", null, resource);
+				String displayName = null;
+				
+				if(resource.isUnknown() || resource.isBanned())
+				{
+					SchematicMap map = gui.tile.loadedSchematic.getSchematicMap(resource.getSchematicBlockId(), resource.getSchematicMeta(), true);
+					if(map == null)
+						displayName = "Error: No mapping found!";
+					else
+					{
+						displayName = map.schematicBlockName;
+						if(displayName == null || displayName.isEmpty())
+							displayName = map.schematicBlockId + ":" + map.schematicMeta;
+					}
+				}
+				else if(resource.getBlock() == Blocks.air)
+					displayName = "Air";
+				else if(resource.getItem() != null)
+					displayName = resource.getItem().getDisplayName()+"("+resource.getMeta()+")";
 				else
-					listEntry = new GuiListEntryResource(resource.getBlock().getUnlocalizedName()+"("+resource.getMeta()+")", null, resource);
+					displayName = resource.getBlock().getUnlocalizedName()+"("+resource.getMeta()+")";
+				
+				listEntry = new GuiListEntryResource(displayName, null, resource);
 				resourceList.addEntry(listEntry);
 			}
 		}
@@ -131,6 +159,25 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	@Override
 	public void updateGui() {
 		resourceList.update();
+		
+		if(selectingFloorItem)
+		{
+			selectingFloorItem = false;
+			
+			//Change item locally and send the change to server
+			ItemStack newItem = GuiBlockSelector.selectedItem;
+			if(newItem == null)
+				gui.tile.config.floorBlock = null;
+			else
+				gui.tile.config.floorBlock = new SchematicBlock(Block.getBlockFromItem(newItem.getItem()), (byte) newItem.getItemDamage());
+			gui.tile.sendConfigToServer();
+		}
+		//Set Floor
+		if(gui.tile.config.floorBlock != null)
+			buttonFloorItem.setItem(new ItemStack((Block) Block.blockRegistry.getObjectById(gui.tile.config.floorBlock.getSchematicBlockId()), 1, gui.tile.config.floorBlock.getSchematicMeta()), false);
+		else
+			buttonFloorItem.setItem(null, false);
+		
 		
 		updateEnergyLabel();
 	}
@@ -160,7 +207,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		labelStatusContent = new GuiLabel("Idle", guiLeft + 43, guiTop + 15, gui.colorOk);
 		labelEnergy = new GuiLabel("", guiLeft +5, guiTop + 25, gui.colorText);
 		
-		buttonFloorItem = new GuiButtonItem(0, guiLeft + 5, guiTop + 140, 140, 25, null);
+		buttonFloorItem = new GuiButtonItem(0, guiLeft + 5, guiTop + 140, 26, 25, buttonFloorItem != null ? buttonFloorItem.getItem() : null, false);
 		
 		buttonScrollbar = new GuiButtonStretched(0, resourceList.posX + resourceList.width, resourceList.posY + resourceList.height, "");
 		resourceList.setScrollbarButton(buttonScrollbar);
@@ -252,6 +299,13 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 			int x = Mouse.getEventX() * this.width / this.mc.displayWidth;
 	        int y = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
 			resourceList.onButtonDragStart(button, x, y);
+		}
+		else if(button == buttonFloorItem) {
+			GuiBlockSelector blockSelector = new GuiBlockSelector();
+			gui.showModal(blockSelector);
+
+			blockSelector.setSelected(buttonFloorItem.getItem());
+			selectingFloorItem = true;
 		}
 	}
 	

@@ -16,15 +16,15 @@ public class GuiButtonItem extends GuiButtonStretched {
 	private ItemStack item;
 	
 	public GuiButtonItem(int id, int x, int y,
-			ItemStack item) {
+			ItemStack item, boolean showName) {
 		super(id, x, y, "");
-		setItem(item);
+		setItem(item, showName);
 	}
 	
 	public GuiButtonItem(int id, int x, int y,
-			int width, int height, ItemStack item) {
+			int width, int height, ItemStack item, boolean showName) {
 		super(id, x, y, width, height, "");
-		setItem(item);
+		setItem(item, showName);
 	}
 	
 	@Override
@@ -45,11 +45,16 @@ public class GuiButtonItem extends GuiButtonStretched {
 		return item;
 	}
 	
-	public void setItem(ItemStack item) {
+	public void setItem(ItemStack item, boolean showName) {
 		this.item = item;
-		if(item != null && item.getItem() != null)
-			this.displayString = item.getDisplayName();
+		if(showName)
+		{
+			if(item != null && item.getItem() != null)
+				this.displayString = item.getDisplayName();
+			else
+				this.displayString = "None";
+		}
 		else
-			this.displayString = "None";
+			this.displayString = "";
 	}
 }

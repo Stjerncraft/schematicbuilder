@@ -141,7 +141,6 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		schematicList.noUpdate = true;
 		for(File file : fileList)
 		{
-			System.out.println("Schematic File: " + file.getName());
 			if(schematicFiles.containsKey(file.getName()))
 				continue;
 		

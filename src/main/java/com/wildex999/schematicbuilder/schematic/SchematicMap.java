@@ -9,31 +9,33 @@ import io.netty.buffer.ByteBuf;
  */
 
 public class SchematicMap {
-	public short originalBlockId;
-	public byte originalMeta;
-	public String originalName; //Name this was mapped to
+	public short schematicBlockId;
+	public byte schematicMeta;
+	public String schematicBlockName; //Name this was originally mapped to
 	
 	public short blockId; //The Server BlockId, or -1 if no server id is known
 	public byte meta;
 	
 	
 	public void toBytes(ByteBuf buf) {
-		buf.writeShort(originalBlockId);
-		buf.writeByte(originalMeta);
-		if(originalName == null)
+		buf.writeShort(schematicBlockId);
+		buf.writeByte(schematicMeta);
+		if(schematicBlockName == null)
 			ByteBufUtils.writeUTF8String(buf, "");
 		else
-			ByteBufUtils.writeUTF8String(buf, originalName);
+			ByteBufUtils.writeUTF8String(buf, schematicBlockName);
 		
+		//Assumption: This map is only serialized to be sent between server and client, not stored between restarts.
+		//Thus, the block ID's should not change, and we need not serialize the current name of the block.
 		buf.writeShort(blockId);
 		buf.writeByte(meta);
 	}
 
 
 	public void fromBytes(ByteBuf buf) {
-		originalBlockId = buf.readShort();
-		originalMeta = buf.readByte();
-		ByteBufUtils.readUTF8String(buf);
+		schematicBlockId = buf.readShort();
+		schematicMeta = buf.readByte();
+		schematicBlockName = ByteBufUtils.readUTF8String(buf);
 		
 		blockId = buf.readShort();
 		meta = buf.readByte();

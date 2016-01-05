@@ -421,7 +421,7 @@ public class WorldSchematicVisualizer {
 						Block worldBlock = vTile.getWorldObj().getBlock(vTile.buildX+x, vTile.yCoord+(y+1), (vTile.buildZ+1)+z);
 						if(worldBlock != Blocks.air)
 							continue;
-						renderBlocksRi.renderBlockByRenderType((Block)Block.blockRegistry.getObjectById(vTile.config.floorBlock.getOriginalBlockId()), x, y, z);
+						renderBlocksRi.renderBlockByRenderType((Block)Block.blockRegistry.getObjectById(vTile.config.floorBlock.getSchematicBlockId()), x, y, z);
 					}
 				}
 			}

@@ -299,6 +299,7 @@ public class GuiList extends Gui {
 		}
 		
 		update();
+		updateScrollBar();
 		return true;
 	}
 	
@@ -351,6 +352,7 @@ public class GuiList extends Gui {
 		}
 		
 		update();
+		updateScrollBar();
 		
 		return true;
 	}
@@ -585,7 +587,7 @@ public class GuiList extends Gui {
 	public void scrollToScrollbar() {
 		//How much one unit of scrollbar movement equals
 		float scrollFactor = (float)overflow / (float)(height - scrollBar.height);
-		yScroll = (int) Math.ceil((scrollBar.yPosition - posY) * scrollFactor);
+		yScroll = (int) Math.round((scrollBar.yPosition - posY) * scrollFactor);
 		
 		updateTop();
 	}
@@ -707,6 +709,8 @@ public class GuiList extends Gui {
 	
 	public void onButtonDrag(GuiButton button, int x, int y) {
 		if(scrollBar == null || button != scrollBar)
+			return;
+		if(y == scrollStartY)
 			return;
 		
 		//scrollBar.yPosition = y - (scrollBar.height/2);

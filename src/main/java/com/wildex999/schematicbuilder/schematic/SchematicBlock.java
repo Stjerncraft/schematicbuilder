@@ -47,11 +47,20 @@ public class SchematicBlock {
 	}
 	
 	//Get original BlockId
-	public int getOriginalBlockId() {
+	public short getSchematicBlockId() {
 		return block;
 	}
 	
-	public byte getOriginalMeta() {
+	public byte getSchematicMeta() {
 		return metaData;
 	}
+	
+	//Get the original name of block, or an empty string if not known
+	public String getOriginalName(Schematic schematic) {
+		SchematicMap map = schematic.getSchematicMap(block, metaData, false);
+		if(map == null || map.blockId == -1)
+			return "";
+		return map.schematicBlockName;
+	}
+
 }

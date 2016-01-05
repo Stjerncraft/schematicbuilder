@@ -13,9 +13,10 @@ public class ResourceItem {
 	
 	private static Random rand = new Random();
 	
-	//Original BlockID and Meta. Used when chainging the placed block from the Schematic original
+	//Original BlockID and Meta. Used when changing the placed block from the Schematic original
+	//The Resource Entry can potentially define a different block than the one given here.
 	private short schematicBlockId;
-	private byte shematicMeta;
+	private byte schematicMeta;
 	
 	private ResourceEntry resourceEntry;
 	
@@ -23,10 +24,19 @@ public class ResourceItem {
 	public int blockCount; //Number of Blocks of this resource that exists in the Schematic
 	public int storedItemCount; //Number of items for this Resource that has been stored for use when placing
 	
-	public ResourceItem(ResourceEntry entry) {
+	public ResourceItem(short schematicBlockId, byte schematicMeta, ResourceEntry entry) {
 		this.resourceEntry = entry;
+		this.schematicBlockId = schematicBlockId;
+		this.schematicMeta = schematicMeta;
 	}
 	
+	public boolean isUnknown() {
+		return resourceEntry == ResourceEntry.Unknown;
+	}
+	
+	public boolean isBanned() {
+		return resourceEntry == ResourceEntry.Banned;
+	}
 	
 	public Block getBlock() {
 		return resourceEntry.block;
@@ -42,6 +52,14 @@ public class ResourceItem {
 	
 	public float getItemCostPerBlock() {
 		return resourceEntry.itemCostPerBlock;
+	}
+	
+	public short getSchematicBlockId() {
+		return schematicBlockId;
+	}
+	
+	public byte getSchematicMeta() {
+		return schematicMeta;
 	}
 	
 	public void toBytes(ByteBuf buf) {

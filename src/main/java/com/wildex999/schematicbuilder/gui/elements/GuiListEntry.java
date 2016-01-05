@@ -43,6 +43,14 @@ public class GuiListEntry extends Gui {
 	//x and y is the top left corner of the entry in screen coordinates.
 	//width and height is the size given to the entry by the List.
 	public void draw(Minecraft mc, int x, int y, int width, int height, boolean shade) {
+		int fontColor = 0xFFFFFF;
+		int scale = 2;
+		GL11.glScalef(1f/scale, 1f/scale, 1);
+		
+		int fontHeight = mc.fontRenderer.FONT_HEIGHT;
+		int offset = 24;
+		
+		this.drawString(mc.fontRenderer, name, scale*(x + offset), scale*(y + 2), fontColor);
 	}
 	
 }

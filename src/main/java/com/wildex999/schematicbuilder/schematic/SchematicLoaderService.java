@@ -72,13 +72,28 @@ public class SchematicLoaderService {
 				System.out.println("Time spent decompressing uploaded Schematic: " + TimeUnit.MILLISECONDS.convert(timeEnd-timeStart, TimeUnit.NANOSECONDS) + " ms");
 			}
 			
-			schematic = Schematic.fromBytes(buf, blockCount);
+			
+			String errorMessage = null;
+			try {
+				schematic = Schematic.fromBytes(buf, blockCount);
+			} catch(Exception e) {
+				schematic = null;
+				errorMessage = "Error parsing serialized Schematic: " + e.getMessage();
+				System.err.println(errorMessage);
+			}
 			
 			//Prepare answer
 			Result result = new Result();
 			result.schematic = schematic;
-			result.message = null;
-			result.blockCount = blockCount;
+			if(schematic == null)
+			{
+				result.message = errorMessage;
+			}
+			else
+			{
+				result.message = null;
+				result.blockCount = blockCount;
+			}
 			
 			return result;
 		}

@@ -21,18 +21,18 @@ import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.gui.elements.GuiListEntry;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
-public class GuiListEntryResource extends GuiListEntry {
+import cpw.mods.fml.common.registry.GameData;
+
+public class GuiListEntryBlock extends GuiListEntry {
 	
-	public ResourceItem resource;
+	ItemStack item;
 	
 	public static int colorBgNormal = 0xFF000000;
-	public static int colorBgUnknown = 0xCBE02E00;
-	public static int colorBgBanned = 0xAF2A2300;
 	public static int colorBgSelected = 0xFF3DBF1D;
 	
-	public GuiListEntryResource(String name, List<String> tags, ResourceItem resource) {
+	public GuiListEntryBlock(String name, List<String> tags, ItemStack item) {
 		super(name, tags);
-		this.resource = resource;
+		this.item = item;
 	}
 	
 	@Override
@@ -42,10 +42,6 @@ public class GuiListEntryResource extends GuiListEntry {
 		int color;
 		if(selected)
 			color = colorBgSelected;
-		else if(resource.isUnknown())
-			color = colorBgUnknown;
-		else if(resource.isBanned())
-			color = colorBgBanned;
 		else
 			color = colorBgNormal;
 		
@@ -57,17 +53,10 @@ public class GuiListEntryResource extends GuiListEntry {
 		this.drawRect(x, (y+height - border), (x+width), (y+height), 0xFFFFFFFF);
 		
 		//Draw item
-		ItemStack itemStack = resource.getItem();
-		//ItemStack itemStack = new ItemStack(Item.getItemFromBlock(Blocks.redstone_wire));
-		//System.out.println("Block: " + Block.getBlockFromItem(Items.redstone));
-		//ItemStack itemStack = Block.
-		
-		//RenderBlocks.getInstance().renderBlockAsItem(Blocks.redstone_wire, 0, 1.0F);
 		try {
-			if(itemStack != null && itemStack.getItem() != null)
+			if(item != null && item.getItem() != null)
 			{
-				//RenderHelper.enableGUIStandardItemLighting();
-				RenderItem.getInstance().renderItemIntoGUI(mc.fontRenderer, mc.getTextureManager(), itemStack, (x+5), (y+5));
+				RenderItem.getInstance().renderItemIntoGUI(mc.fontRenderer, mc.getTextureManager(), item, (x+5), (y+5));
 				RenderHelper.disableStandardItemLighting();
 			}
 		} catch(Exception e) {
@@ -82,9 +71,9 @@ public class GuiListEntryResource extends GuiListEntry {
 		int offset = 24;
 		
 		this.drawString(mc.fontRenderer, name, scale*(x + offset), scale*(y + 2), fontColor);
-		this.drawString(mc.fontRenderer, "Missing: " + (resource.blockCount - resource.storedItemCount - resource.placedCount), scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
-		this.drawString(mc.fontRenderer, "Stored: " + resource.storedItemCount, scale*(x + offset), scale*(y+2)+fontHeight*2, fontColor);
-		this.drawString(mc.fontRenderer, "Used  : " + resource.placedCount, scale*(x + offset), scale*(y+2)+fontHeight*3, fontColor);
+		//this.drawString(mc.fontRenderer, "Missing: " + (resource.blockCount - resource.storedItemCount - resource.placedCount), scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
+		//this.drawString(mc.fontRenderer, "Stored: " + resource.storedItemCount, scale*(x + offset), scale*(y+2)+fontHeight*2, fontColor);
+		//this.drawString(mc.fontRenderer, "Used  : " + resource.placedCount, scale*(x + offset), scale*(y+2)+fontHeight*3, fontColor);
 		
 		GL11.glScalef(scale, scale, 1);
 		
@@ -93,3 +82,4 @@ public class GuiListEntryResource extends GuiListEntry {
 	}
 
 }
+
