@@ -34,14 +34,18 @@ public class TickHandler {
 			nextSave = currentTime + saveFrequency*1000;
 			ModSchematicBuilder mod = ModSchematicBuilder.instance;
 			
-			if(mod.debug)
-				ModLog.logger.info("Saving changed configs...");
+			/*if(mod.debug)
+				ModLog.logger.info("Saving changed configs...");*/
 			
 			if(mod.configGeneral.markedForSave)
+			{
+				if(mod.debug)
+					ModLog.logger.info("Saving config: General");
 				mod.configGeneral.saveConfig(true);
+			}
 			
-			if(mod.debug)
-				ModLog.logger.info("Done saving config.");
+			/*if(mod.debug)
+				ModLog.logger.info("Done saving config.");*/
 		}
 	}
 }

@@ -59,7 +59,7 @@ public class SchematicBlock {
 	public String getOriginalName(Schematic schematic) {
 		SchematicMap map = schematic.getSchematicMap(block, metaData, false);
 		if(map == null || map.blockId == -1)
-			return "";
+			return "Error: No name for " + block + ":" + metaData;
 		return map.schematicBlockName;
 	}
 

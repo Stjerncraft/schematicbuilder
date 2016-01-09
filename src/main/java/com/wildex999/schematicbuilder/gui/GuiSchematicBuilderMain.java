@@ -406,7 +406,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		}
 		else if(labelStatusContent.isOver(mouseX, mouseY))
 		{
-			if(gui.tile.message != null && gui.tile.state == BuilderState.ERROR)
+			if(gui.tile.message != null)
 				textList.add(gui.tile.message);
 		}
 		

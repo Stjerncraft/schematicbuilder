@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -40,6 +41,7 @@ import net.minecraft.world.ChunkCache;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.ResourceItem;
+import com.wildex999.schematicbuilder.ResourceManager;
 import com.wildex999.schematicbuilder.SchematicWorldCache;
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
@@ -75,7 +77,10 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	private GuiLabel labelStatus;
 	private GuiLabel labelStatusContent;
 	private GuiLabel labelEnergy;
+	private GuiLabel labelInput;
+	private GuiLabel labelOutput;
 	
+	private int resourceVersion = 0; //Used to check when to reload Resources from tile
 	private GuiList resourceList;
 	private GuiButtonStretched buttonScrollbar;
 	
@@ -110,55 +115,121 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		selectingFloorItem = false;
 	}
 	
+	//Add resource to GUI List
+	public void addResource(ResourceItem resource) {
+		GuiListEntryResource listEntry = new GuiListEntryResource(getEntryName(resource), null, resource);
+		resourceList.addEntry(listEntry);
+	}
 	
-	@Override
-	public void onTabActivated() {		
+	//Remove invalid resources and add new ones
+	public void updateResources() {
+		if(gui.tile.loadedSchematic == null || gui.tile.resources == null)
+		{
+			reloadResources(); //Essentially clear the list
+			return;
+		}
+		
+		//Assumption: If a resource is removed by being invalid, a new one must be added in it's place.(Schematic block list is unchanging, only mapping changes)
+		resourceList.noUpdate = true;
+		
+		//Get list of entries to replace(Avoid Concurrent modification)
+		ArrayList<GuiListEntryResource> changeList = new ArrayList<GuiListEntryResource>();
+		for(Map.Entry<String, GuiListEntry> entry : resourceList.getCurrentList().entrySet()) {
+			String name = entry.getKey();
+			GuiListEntryResource resourceEntry = (GuiListEntryResource)entry.getValue();
+			
+			if(resourceEntry.resource.valid)
+				continue;
+			
+			changeList.add(resourceEntry);
+		}
+		
+		//Modify List
+		for(GuiListEntryResource resourceEntry : changeList) {
+			//Remove old entry, and add new one for same Schematic Block ID & Meta, which should now have a new Resource
+			resourceList.removeEntry(resourceEntry);
+			ResourceItem newResource = ResourceManager.getResource(gui.tile.resources, resourceEntry.resource.getSchematicBlockId(), resourceEntry.resource.getSchematicMeta());
+			if(newResource == null)
+			{
+				ModLog.printTileInfoPrefix(gui.tile);
+				ModLog.logger.warn("Failed to get new Resource for Schematic Block: " + resourceEntry.resource.getSchematicBlockId() + ":" + resourceEntry.resource.getSchematicMeta()
+									+ " while updating GUI Resource list.");
+				continue;
+			}
+			addResource(newResource);
+		}
+		
+		resourceList.noUpdate = false;
+		resourceList.update();
+	}
+	
+	public void reloadResources() {
+		resourceList.clear();
+		
 		//Populate Resource List
 		if(gui.tile.loadedSchematic != null && gui.tile.resources != null)
 		{
 			for(Entry<Short, ResourceItem> entry : gui.tile.resources.entrySet())
 			{
 				ResourceItem resource = entry.getValue();
-				GuiListEntryResource listEntry;
-				String displayName = null;
-				
-				if(resource.isUnknown() || resource.isBanned())
-				{
-					SchematicMap map = gui.tile.loadedSchematic.getSchematicMap(resource.getSchematicBlockId(), resource.getSchematicMeta(), true);
-					if(map == null)
-						displayName = "Error: No mapping found!";
-					else
-					{
-						displayName = map.schematicBlockName;
-						if(displayName == null || displayName.isEmpty())
-							displayName = map.schematicBlockId + ":" + map.schematicMeta;
-					}
-				}
-				else if(resource.getBlock() == Blocks.air)
-					displayName = "Air";
-				else if(resource.getItem() != null)
-					displayName = resource.getItem().getDisplayName()+"("+resource.getMeta()+")";
-				else
-					displayName = resource.getBlock().getUnlocalizedName()+"("+resource.getMeta()+")";
-				
-				listEntry = new GuiListEntryResource(displayName, null, resource);
-				resourceList.addEntry(listEntry);
+				addResource(resource);
 			}
 		}
 		
+		resourceList.update();
+	}
+	
+	public String getEntryName(ResourceItem resource) {
+		String displayName = null;
+		
+		if(resource.isUnknown() || resource.isBanned())
+		{
+			SchematicMap map = gui.tile.loadedSchematic.getSchematicMap(resource.getSchematicBlockId(), resource.getSchematicMeta(), true);
+			if(map == null)
+				displayName = "Error: No mapping found!(" + resource.getSchematicBlockId() + ":" + resource.getSchematicMeta() + ")";
+			else
+			{
+				displayName = map.schematicBlockName;
+				if(displayName == null || displayName.isEmpty())
+					displayName = map.schematicBlockId + ":" + map.schematicMeta;
+			}
+		}
+		else if(resource.getBlock() == Blocks.air)
+			displayName = "Air";
+		else if(resource.getItem() != null)
+			displayName = resource.getItem().getDisplayName()+"("+resource.getMeta()+")";
+		else
+			displayName = resource.getBlock().getUnlocalizedName()+"("+resource.getMeta()+")";
+		
+		return displayName;
+	}
+	
+	@Override
+	public void onTabActivated() {	
+		//TODO: Only update instead of reload when changing tabs?
+		reloadResources();
+		
 		gui.container.hidePlayerInventory(false);
+		gui.container.hideInventory(false);
 	}
 	
 	@Override
 	public void onTabDeactivated() {
 		gui.container.hidePlayerInventory(true);
+		gui.container.hideInventory(true);
 		//TODO: Allow it to remain, but detect if new Schematic is loaded
 		resourceList.clear();
 	}
 	
 	@Override
 	public void updateGui() {
-		resourceList.update();
+		if(gui.tile.resourceVersion == this.resourceVersion)
+			updateResources();
+		else
+		{
+			reloadResources();
+			this.resourceVersion = gui.tile.resourceVersion;
+		}
 		
 		if(selectingFloorItem)
 		{
@@ -206,8 +277,10 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		labelStatus = new GuiLabel("Status:", guiLeft + 5, guiTop + 15, gui.colorText);
 		labelStatusContent = new GuiLabel("Idle", guiLeft + 43, guiTop + 15, gui.colorOk);
 		labelEnergy = new GuiLabel("", guiLeft +5, guiTop + 25, gui.colorText);
+		labelInput = new GuiLabel("Input:", guiLeft + 119, guiTop + 134, gui.colorText);
+		labelOutput = new GuiLabel("Output:", guiLeft + 114, guiTop + 151, gui.colorText);
 		
-		buttonFloorItem = new GuiButtonItem(0, guiLeft + 5, guiTop + 140, 26, 25, buttonFloorItem != null ? buttonFloorItem.getItem() : null, false);
+		buttonFloorItem = new GuiButtonItem(0, guiLeft + 5, guiTop + 120, 26, 25, buttonFloorItem != null ? buttonFloorItem.getItem() : null, false);
 		
 		buttonScrollbar = new GuiButtonStretched(0, resourceList.posX + resourceList.width, resourceList.posY + resourceList.height, "");
 		resourceList.setScrollbarButton(buttonScrollbar);
@@ -234,10 +307,13 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		resourceList.draw(mc);
 		
 		labelContainerName.draw(fontRendererObj);
-		//labelStatus.draw(fontRendererObj);
+		labelStatus.draw(fontRendererObj);
 		labelStatusContent.draw(fontRendererObj);
 		if(ModSchematicBuilder.useEnergy)
 			labelEnergy.draw(fontRendererObj);
+		
+		labelInput.draw(fontRendererObj);
+		labelOutput.draw(fontRendererObj);
 	}
 	
 	@Override

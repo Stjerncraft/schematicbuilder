@@ -6,8 +6,10 @@ import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
+import net.minecraft.inventory.ICrafting;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
 
 public class ContainerSchematicBuilder extends Container {
 
@@ -18,6 +20,10 @@ public class ContainerSchematicBuilder extends Container {
 	private int playerInventoryX = 0;
 	private int playerInventoryY = 0;
 	
+	private int inventoryIndex = 0;
+	private int inventoryX = 0;
+	private int inventoryY = 0;
+	
 	private TileSchematicBuilder tile;
 	private InventoryPlayer playerInventory;
 	
@@ -27,7 +33,7 @@ public class ContainerSchematicBuilder extends Container {
 		this.playerInventory = playerInventory;
 		
 		initPlayerInventory(playerInventory, 6, 172);
-		initContainerInventory(tile.getInventory(), 6, 155);
+		initContainerInventory(tile.getInventory(), 150, 130);
 		
 		if(tile instanceof IGuiWatchers)
 			((IGuiWatchers)tile).addWatcher(playerInventory.player);
@@ -61,8 +67,10 @@ public class ContainerSchematicBuilder extends Container {
 	
 	//Initialize the Container inventory
 	protected void initContainerInventory(IInventory inventory, int invX, int invY) {
-		this.addSlotToContainer(new Slot(inventory, tile.inventorySlotGround, invX, invY)); //Ground
-		this.addSlotToContainer(new Slot(inventory, tile.inventorySlotSwap, invX, invY-30)); //Swap
+		inventoryIndex = inventorySlots.size();
+		this.addSlotToContainer(new SlotInput(inventory, tile.inventorySlotInput, 0, 0, tile)); //Input
+		this.addSlotToContainer(new SlotOutput(inventory, tile.inventorySlotOutput, 0, 0)); //Output
+		setInventoryPosition(invX, invY);
 	}
 	
 	public void setPlayerInventoryPosition(int x, int y) {
@@ -91,6 +99,24 @@ public class ContainerSchematicBuilder extends Container {
         }
 	}
 	
+	public void setInventoryPosition(int x, int y) {
+		Slot slot;
+		int offset = inventoryIndex;
+		
+		inventoryX = x;
+		inventoryY = y;
+		
+		//Input
+		slot = (Slot)inventorySlots.get(offset++);
+		slot.xDisplayPosition = x;
+		slot.yDisplayPosition = y;
+		
+		//Output
+		slot = (Slot)inventorySlots.get(offset++);
+		slot.xDisplayPosition = x;
+		slot.yDisplayPosition = y + 18;
+	}
+	
 	public void hidePlayerInventory(boolean hide) {
 		if(hide)
 		{
@@ -103,6 +129,19 @@ public class ContainerSchematicBuilder extends Container {
 		}
 		else
 			setPlayerInventoryPosition(playerInventoryX, playerInventoryY);
+	}
+	
+	public void hideInventory(boolean hide) {
+		if(hide)
+		{
+			int oldX = inventoryX;
+			int oldY = inventoryY;
+			setInventoryPosition(-1000, -1000);
+			inventoryX = oldX;
+			inventoryY = oldY;
+		}
+		else
+			setInventoryPosition(inventoryX, inventoryY);
 	}
 	
 	public int getPlayerInventoryX() {

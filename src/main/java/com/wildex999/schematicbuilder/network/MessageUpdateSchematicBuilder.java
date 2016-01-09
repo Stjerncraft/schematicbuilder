@@ -8,6 +8,7 @@ import java.util.Map;
 import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.tiles.BuilderState;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
+import com.wildex999.utils.ModLog;
 
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
@@ -25,7 +26,8 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 		FULL(0), //State, schematic id, message and name
 		MESSAGE(1), //State and message
 		CONFIG(2), //Config Update
-		RESOURCE(3); //Resources update
+		RESOURCE(3), //Resources update
+		RESOURCELIST(4); //Full list of Resources and values
 		
 		private final int value;
 		
@@ -60,6 +62,7 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	String message;
 	UpdateType updateType;
 	TileSchematicBuilder.Config config;
+	boolean hasPreviousOutput;
 	
 	int energyMax;
 	int energyCurrent;
@@ -69,7 +72,7 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	public MessageUpdateSchematicBuilder() {}
 	
 	//Send Constructor(FULL)
-	public MessageUpdateSchematicBuilder(TileEntity tile, BuilderState state, String name, String author, String message, String schematicId, int width, int height, int length, TileSchematicBuilder.Config config) {
+	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, BuilderState state, String name, String author, String message, String schematicId, int width, int height, int length, TileSchematicBuilder.Config config) {
 		tileInfo = new TileEntityInfo(tile);
 		newState = state;
 		schematicName = name;
@@ -83,11 +86,13 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 			this.schematicId = "";
 		this.message = message;
 		this.config = config;
+		this.hasPreviousOutput = tile.hasPreviousOutput;
+		
 		updateType = UpdateType.FULL;
 	}
 	
 	//Send Constructor(MESSAGE)
-	public MessageUpdateSchematicBuilder(TileEntity tile, BuilderState state, String message) {
+	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, BuilderState state, String message) {
 		tileInfo = new TileEntityInfo(tile);
 		newState = state;
 		this.message = message;
@@ -95,20 +100,28 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	}
 	
 	//Send Constructor(CONFIG)
-	public MessageUpdateSchematicBuilder(TileEntity tile, TileSchematicBuilder.Config config) {
+	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, TileSchematicBuilder.Config config) {
 		tileInfo = new TileEntityInfo(tile);
 		this.config = config;
 		updateType = UpdateType.CONFIG;
 	}
 	
 	//Send Constructor(RESOURCE)
-	public MessageUpdateSchematicBuilder(TileEntity tile, int currentEnergy, int maxEnergy, ArrayList<ResourceItem> resources)
+	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, int currentEnergy, int maxEnergy, ArrayList<ResourceItem> resources)
 	{
 		tileInfo = new TileEntityInfo(tile);
 		energyCurrent = currentEnergy;
 		energyMax = maxEnergy;
 		this.resources = resources;
 		updateType = UpdateType.RESOURCE;
+	}
+	
+	//Send Constructor(RESOURCELIST)
+	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, ArrayList<ResourceItem> resources)
+	{
+		tileInfo = new TileEntityInfo(tile);
+		this.resources = resources;
+		updateType = UpdateType.RESOURCELIST;
 	}
 	
 	@Override
@@ -135,11 +148,31 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 			schematicLength = buf.readInt();
 			config = new TileSchematicBuilder.Config();
 			config.fromBytes(buf);
+			hasPreviousOutput = buf.readBoolean();
 			break;
 		case RESOURCE:
 			energyCurrent = buf.readInt();
 			energyMax = buf.readInt();
-			//TODO: Read Resources
+			//Fall through to next case, as it's the same code for reading the list
+		case RESOURCELIST:
+			int resourceCount = buf.readInt();
+			resources = new ArrayList<ResourceItem>(resourceCount);
+			
+			if(resourceCount > 0)
+			{
+				for(int i=0; i < resourceCount; i++) {
+					ResourceItem resource = ResourceItem.fromBytes(buf);
+					if(resource == null)
+					{
+						//TODO: Show to player that an error occurred outside log
+						ModLog.logger.error("Error while parsing network packet for SchematicBuilder at X:" + tileInfo.posX + " Y:" + tileInfo.posY + " Z:" + tileInfo.posZ);
+						ModLog.logger.error("Unable to parse Resource Item.");
+						resources.clear();
+						return; //Stop Parsing, better show nothing than only partial data
+					}
+					resources.add(resource);
+				}
+			}
 			break;
 		}
 	}
@@ -167,11 +200,26 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 			buf.writeInt(schematicHeight);
 			buf.writeInt(schematicLength);
 			config.toBytes(buf);
+			buf.writeBoolean(hasPreviousOutput);
 			break;
 		case RESOURCE:
 			buf.writeInt(energyCurrent);
 			buf.writeInt(energyMax);
-			//TODO: Write resources
+			
+			//Fall Trough to ResourceList as it's the same code for writing them.
+		case RESOURCELIST:
+			//Full list of resources
+			if(resources == null || resources.size() == 0)
+				buf.writeInt(0);
+			else
+			{
+				buf.writeInt(resources.size());
+				
+				for(ResourceItem item : resources) {
+					item.toBytes(buf);
+				}
+			}
+			resources.clear();
 			break;
 		}
 	}
@@ -191,7 +239,8 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
         	switch(message.updateType)
         	{
         	case FULL:
-        		tile.networkUpdateFull(message.newState, message.schematicName, message.schematicAuthor, message.message, message.schematicId, message.schematicWidth, message.schematicHeight, message.schematicLength, message.config);
+        		tile.networkUpdateFull(message.newState, message.schematicName, message.schematicAuthor, message.message, message.schematicId, 
+        								message.schematicWidth, message.schematicHeight, message.schematicLength, message.config, message.hasPreviousOutput);
         		break;
         	case MESSAGE:
         		tile.networkUpdateMessage(message.newState, message.message);
@@ -200,7 +249,10 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
         		tile.networkUpdateConfig(message.config);
         		break;
         	case RESOURCE:
-        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, null);
+        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, message.resources);
+        		break;
+        	case RESOURCELIST:
+        		tile.networkUpdateResourceList(message.resources);
         		break;
         	}
         	

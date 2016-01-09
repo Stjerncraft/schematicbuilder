@@ -108,6 +108,7 @@ public class GuiSchematicBuilder implements IGuiHandler
 			}
 			container = (ContainerSchematicBuilder)inventorySlots;
 			container.hidePlayerInventory(true);
+			container.hideInventory(true);
 			
 			tabIdMain = addTab(new GuiSchematicBuilderMain(this));
 			tabIdLocal = addTab(new GuiSchematicBuilderLoadLocal(this));
@@ -157,8 +158,8 @@ public class GuiSchematicBuilder implements IGuiHandler
 			tab.getGui().setWorldAndResolution(mc, width, height);
 			guiLeft = tab.getGuiLeft();
 			guiTop = tab.getGuiTop();
-			width = tab.getGuiWidth() + tabsWidth;
-			height = tab.getGuiHeight();
+			this.xSize = width = tab.getGuiWidth() + tabsWidth;
+			this.ySize = height = tab.getGuiHeight();
 			
 			buttonList.clear();
 			

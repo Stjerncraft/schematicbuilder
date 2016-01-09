@@ -23,6 +23,7 @@ import net.minecraft.nbt.NBTTagCompound;
 public class Schematic {
 	public static int currentSerializedVersion = 1; //Increase whenever there are breaking changes to the serialization format
 	public static int blockIdAir = 0; //TODO: Actually get the BlockId of air. TODO: Allow mapping of air to another block(Change id)
+	public static SchematicBlock blockAir = new SchematicBlock(Blocks.air, (byte) 0);
 	
 	public int serializedVersion = currentSerializedVersion; //Used to handle backwards compatibility for server saved Schematics
 	public String name;
@@ -108,9 +109,13 @@ public class Schematic {
 		
 		ArrayList<SchematicBlock> chunk = chunks.get(getChunkIndex(x >> 4, y >> 4, z >> 4)); //Note: Hardcoded for 16 chunksize
 		if(chunk == null)
-			return null;
+			return blockAir;
 		
-		return chunk.get(getBlockIndex(x & 0xF, y & 0xF, z & 0xF));
+		SchematicBlock block = chunk.get(getBlockIndex(x & 0xF, y & 0xF, z & 0xF));
+		if(block == null)
+			return blockAir;
+		
+		return block;
 	}
 	
 	public int getWidth() {
