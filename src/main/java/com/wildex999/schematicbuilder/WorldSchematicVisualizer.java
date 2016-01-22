@@ -2,16 +2,16 @@ package com.wildex999.schematicbuilder;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 
 import org.lwjgl.opengl.GL11;
-
-import scala.actors.threadpool.Arrays;
 
 import com.google.common.collect.ComparisonChain;
 import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
+import com.wildex999.utils.ModLog;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -28,6 +28,7 @@ import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.relauncher.ReflectionHelper;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
@@ -65,6 +66,7 @@ public class WorldSchematicVisualizer {
 	private double pPosX, pPosY, pPosZ; //Corrected player position
 	private int updateOffset; //Which Chunk to update next
 	
+	private Field bufferSizeField;
 	
 	public TileSchematicBuilder vTile;
 	public TileSchematicBuilder fTile;
@@ -83,8 +85,18 @@ public class WorldSchematicVisualizer {
 	public int sortFreq = 120;
 	public int currentSortFrame = 0;
 	
+	
 	public WorldSchematicVisualizer() {
 		instance = this;
+		
+		//Set private field public for checking if a chunk has nothing rendered
+		try {
+			bufferSizeField = ReflectionHelper.findField(Tessellator.class, "rawBufferIndex", "field_147569_p");
+		}
+		catch (Exception e) {
+			ModLog.logger.error("Unable to get 'rawBufferIndex' field from Tessellator. Unable to render preview!");
+			bufferSizeField = null;
+		}
 	}
 	
 	@SubscribeEvent(priority=EventPriority.HIGHEST)
@@ -184,7 +196,7 @@ public class WorldSchematicVisualizer {
 	}
 
 	public void renderVisualize() {
-		if(vTile == null || vTile.loadedSchematic == null)
+		if(vTile == null || vTile.loadedSchematic == null || bufferSizeField == null)
 			return;
 		
 		Schematic schematic = vTile.loadedSchematic;
@@ -228,16 +240,6 @@ public class WorldSchematicVisualizer {
 			vTile.schematicCache = new SchematicWorldCache(schematic);
 		RenderBlocks renderBlocksRi = new RenderBlocks(vTile.schematicCache);
 		renderBlocksRi.enableAO = false;
-        
-		//Set private field public for checking if a chunk has nothing rendered
-		Field bufferSizeField;
-		try {
-			bufferSizeField = Tessellator.class.getDeclaredField("rawBufferIndex");
-		}
-		catch (Exception e) {
-			return ;
-		}
-		bufferSizeField.setAccessible(true);
 		
 		//Render in 16x16x16 chunks to cache
 		if(renderChunks.size() < chunkCountX*chunkCountY*chunkCountZ) //First time render

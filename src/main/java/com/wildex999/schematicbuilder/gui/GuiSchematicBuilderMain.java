@@ -2,12 +2,12 @@ package com.wildex999.schematicbuilder.gui;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.Project;
 
-import scala.actors.threadpool.Arrays;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
@@ -51,6 +51,7 @@ import com.wildex999.utils.ModLog;
 
 import cpw.mods.fml.client.config.GuiCheckBox;
 import cpw.mods.fml.client.config.GuiSlider;
+import cpw.mods.fml.relauncher.ReflectionHelper;
 
 public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntry {
 	
@@ -122,9 +123,21 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	private GuiButtonCustom tabButton;
 	private int tabId;
 	
+	private Field bufferSizeField;
+	
 	public GuiSchematicBuilderMain(GuiSchematicBuilder.GUI gui) {
 		this.gui = gui;
 		renderChunks = new ArrayList<RenderCache>();
+		
+		//Make private field public to check if chunk has nothing rendered	
+		try {
+			bufferSizeField = ReflectionHelper.findField(Tessellator.class, "rawBufferIndex", "field_147569_p");
+		}
+		catch (Exception e) {
+			ModLog.logger.error("Unable to get 'rawBufferIndex' field from Tessellator. Unable to render preview!");
+			bufferSizeField = null;
+		}
+		
 	}
 	
 	
@@ -353,7 +366,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		
 		Schematic schematic = gui.tile.loadedSchematic;
 		try {
-			if(schematic != null && renderSchematic)
+			if(schematic != null && renderSchematic && bufferSizeField != null)
 			{
 				if(gui.tile.schematicCache == null)
 					gui.tile.schematicCache = new SchematicWorldCache(schematic);
@@ -420,6 +433,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
         float f4;
 		
         ScaledResolution sr = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
+        
         
 		//Camera(Project)
         float farPlaneDistance = (float)((this.mc.gameSettings.renderDistanceChunks + 10) * 16 );
@@ -495,16 +509,6 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		float angle = (float) Math.toRadians(270 -rot);
 		viewX = (float) (viewX * Math.cos(angle) - viewZ * Math.sin(angle));
 		viewZ = (float) (viewX * Math.sin(angle) - viewZ * Math.cos(angle));
-	
-		//Make private field public to check if chunk has nothing rendered	
-		Field bufferSizeField;
-		try {
-			bufferSizeField = Tessellator.class.getDeclaredField("rawBufferIndex");
-		}
-		catch (Exception e) {
-			return ;
-		}
-		bufferSizeField.setAccessible(true);
 		
 		//Render in 16x16x16 chunks to cache
 		if(renderChunks.size() < chunkCountX*chunkCountY*chunkCountZ) //First time render
@@ -811,12 +815,12 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 
 	@Override
 	public int getGuiWidth() {
-		return width;
+		return backgroundWidth;
 	}
 
 	@Override
 	public int getGuiHeight() {
-		return height;
+		return backgroundHeight;
 	}
 	
 	@Override

@@ -421,12 +421,12 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 
 	@Override
 	public int getGuiWidth() {
-		return width;
+		return backgroundWidth;
 	}
 
 	@Override
 	public int getGuiHeight() {
-		return height;
+		return backgroundHeight;
 	}
 	
 	@Override

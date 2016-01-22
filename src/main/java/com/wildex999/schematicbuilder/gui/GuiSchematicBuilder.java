@@ -158,8 +158,8 @@ public class GuiSchematicBuilder implements IGuiHandler
 			tab.getGui().setWorldAndResolution(mc, width, height);
 			guiLeft = tab.getGuiLeft();
 			guiTop = tab.getGuiTop();
-			this.xSize = width = tab.getGuiWidth() + tabsWidth;
-			this.ySize = height = tab.getGuiHeight();
+			this.xSize = tab.getGuiWidth() + tabsWidth;
+			this.ySize = tab.getGuiHeight();
 			
 			buttonList.clear();
 			
