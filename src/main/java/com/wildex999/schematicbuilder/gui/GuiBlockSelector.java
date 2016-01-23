@@ -89,6 +89,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	public GuiBlockSelector() {
 		blockList = new GuiList(this, 0, 0, 230, 211);
 		blockList.entryHeight = 26;
+		blockList.toggleEntries = false;
 	}
 	
 	public void setSelected(ItemStack item) {

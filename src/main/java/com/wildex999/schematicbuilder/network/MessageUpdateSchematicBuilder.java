@@ -68,6 +68,8 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	int energyCurrent;
 	ArrayList<ResourceItem> resources;
 	
+	int floorPlaced, floorStored;
+	
 	//Receive Constructor
 	public MessageUpdateSchematicBuilder() {}
 	
@@ -107,13 +109,16 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	}
 	
 	//Send Constructor(RESOURCE)
-	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, int currentEnergy, int maxEnergy, ArrayList<ResourceItem> resources)
+	public MessageUpdateSchematicBuilder(TileSchematicBuilder tile, int currentEnergy, int maxEnergy, ArrayList<ResourceItem> resources, int floorPlaced, int floorStored)
 	{
 		tileInfo = new TileEntityInfo(tile);
 		energyCurrent = currentEnergy;
 		energyMax = maxEnergy;
 		this.resources = resources;
 		updateType = UpdateType.RESOURCE;
+		
+		this.floorPlaced = floorPlaced;
+		this.floorStored = floorStored;
 	}
 	
 	//Send Constructor(RESOURCELIST)
@@ -153,6 +158,8 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 		case RESOURCE:
 			energyCurrent = buf.readInt();
 			energyMax = buf.readInt();
+			floorPlaced = buf.readInt();
+			floorStored = buf.readInt();
 			//Fall through to next case, as it's the same code for reading the list
 		case RESOURCELIST:
 			int resourceCount = buf.readInt();
@@ -173,6 +180,7 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 					resources.add(resource);
 				}
 			}
+			
 			break;
 		}
 	}
@@ -205,6 +213,8 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 		case RESOURCE:
 			buf.writeInt(energyCurrent);
 			buf.writeInt(energyMax);
+			buf.writeInt(floorPlaced);
+			buf.writeInt(floorStored);
 			
 			//Fall Trough to ResourceList as it's the same code for writing them.
 		case RESOURCELIST:
@@ -220,6 +230,7 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 				}
 			}
 			resources.clear();
+			
 			break;
 		}
 	}
@@ -249,7 +260,7 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
         		tile.networkUpdateConfig(message.config);
         		break;
         	case RESOURCE:
-        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, message.resources);
+        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, message.resources, message.floorPlaced, message.floorStored);
         		break;
         	case RESOURCELIST:
         		tile.networkUpdateResourceList(message.resources);

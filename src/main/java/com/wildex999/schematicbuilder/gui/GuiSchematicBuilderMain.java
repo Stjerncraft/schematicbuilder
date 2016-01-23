@@ -254,7 +254,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 			labelStatusContent.color = gui.colorError;
 			break;
 		case NEEDRESOURCES:
-			labelStatusContent.label = "Missing Resource: " + gui.tile.message;
+			labelStatusContent.label = "Missing: " + gui.tile.message;
 			labelStatusContent.color = gui.colorError;
 			buttonBuild.displayString = stringStop;
 			buttonBuild.enabled = true;
@@ -270,6 +270,11 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		default:
 			labelStatusContent.label = "Unknown State: " + state + "(" + gui.tile.message + ")";
 			labelStatusContent.color = gui.colorError;
+		}
+		
+		//Trim too long message
+		if(labelStatusContent.label.length() > 32) {
+			labelStatusContent.label = labelStatusContent.label.substring(0, 32) + "...";
 		}
 	}
 	

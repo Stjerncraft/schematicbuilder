@@ -16,11 +16,11 @@ public class ModLog {
 	
 	//Print TileEntity Name, World and Coordinates as a prefix for error message to follow.
 	public static void printTileErrorPrefix(TileEntity tile) {
-		System.err.println(getTileMessagePrefix(tile, "Error"));
+		logger.error(getTileMessagePrefix(tile, "Error"));
 	}
 	
 	public static void printTileInfoPrefix(TileEntity tile) {
-		System.out.println(getTileMessagePrefix(tile, "Info"));
+		logger.info(getTileMessagePrefix(tile, "Info"));
 	}
 	
 	private static String getTileMessagePrefix(TileEntity tile, String messageType) {

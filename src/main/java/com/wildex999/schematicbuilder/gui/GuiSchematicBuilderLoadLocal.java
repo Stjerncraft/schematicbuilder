@@ -324,15 +324,17 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 	@Override
 	protected void keyTyped(char eventChar, int eventKey) {
 		gui.ignoreKeyboardEvent = true;
+		String tagsString = textFieldFilterTags.getText();
 		if(textFieldSearch.textboxKeyTyped(eventChar, eventKey))
 		{
-			schematicList.setSearchString(textFieldSearch.getText(), searchCaseToggled);
+			schematicList.setSearchString(textFieldSearch.getText(), (tagsString.length() > 0 ? tagsString.split(",") : null), searchCaseToggled);
 			updateGui();
 			return;
 		}
 		else if(textFieldFilterTags.textboxKeyTyped(eventChar, eventKey))
 		{
-			//schematicList.setTagFilters();
+			tagsString = textFieldFilterTags.getText();
+			schematicList.setSearchString(textFieldSearch.getText(), (tagsString.length() > 0 ? tagsString.split(",") : null), searchCaseToggled);
 			updateGui();
 			return;
 		}
@@ -384,7 +386,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 			searchCaseToggled = !searchCaseToggled;
 			buttonSearchCase.toggled = searchCaseToggled;
 			if(textFieldSearch.getText().length() > 0)
-				schematicList.setSearchString(textFieldSearch.getText(), searchCaseToggled);
+				schematicList.setSearchString(textFieldSearch.getText(), null, searchCaseToggled);
 		}
 		else if(button == buttonSchematicsFolder)
 		{

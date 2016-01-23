@@ -13,14 +13,14 @@ import net.minecraft.client.gui.Gui;
 public class GuiListEntry extends Gui {
 	
 	public String name;
-	public List<String> tags;
+	public String[] tags;
 	
 	public Object value;
 	public GuiList list;
 	public int border = 1; //Space between two entries
 	public boolean selected;
 	
-	public GuiListEntry(String name, List<String> tags) {
+	public GuiListEntry(String name, String[] tags) {
 		this.name = name;
 		this.tags = tags;
 	}

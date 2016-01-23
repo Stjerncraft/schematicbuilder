@@ -30,7 +30,7 @@ public class GuiListEntryResource extends GuiListEntry {
 	public static int colorBgBanned = 0xAF2A2300;
 	public static int colorBgSelected = 0xFF3DBF1D;
 	
-	public GuiListEntryResource(String name, List<String> tags, ResourceItem resource) {
+	public GuiListEntryResource(String name, String[] tags, ResourceItem resource) {
 		super(name, tags);
 		this.resource = resource;
 	}
@@ -82,7 +82,7 @@ public class GuiListEntryResource extends GuiListEntry {
 		int offset = 24;
 		
 		this.drawString(mc.fontRenderer, name, scale*(x + offset), scale*(y + 2), fontColor);
-		this.drawString(mc.fontRenderer, "Missing: " + (resource.blockCount - resource.storedCount - resource.placedCount), scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
+		this.drawString(mc.fontRenderer, "Missing: " + (resource.blockCount - resource.storedCount - resource.placedCount) + "(" + resource.getItemCostPerBlock() + ")", scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
 		this.drawString(mc.fontRenderer, "Stored: " + resource.storedCount, scale*(x + offset), scale*(y+2)+fontHeight*2, fontColor);
 		this.drawString(mc.fontRenderer, "Used  : " + resource.placedCount, scale*(x + offset), scale*(y+2)+fontHeight*3, fontColor);
 		

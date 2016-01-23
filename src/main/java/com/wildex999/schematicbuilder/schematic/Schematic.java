@@ -278,7 +278,18 @@ public class Schematic {
 				{
 					byte gotChunk = buf.readByte();
 					if(gotChunk == 0)
+					{
+						//Count air
+						if(blockCount != null)
+						{
+							MutableInt count = blockCount.get(0);
+							if(count != null)
+								blockCount.get(0).increment();
+							else
+								blockCount.put((short) 0, new MutableInt(1));
+						}
 						continue;
+					}
 					
 					//Write Blocks
 					for(int x = chunkX*chunkSize; x < width && x < (chunkX+1) * chunkSize; x++)
@@ -297,9 +308,9 @@ public class Schematic {
 
 								newSchematic.setBlock(x, y, z, (short)blockId, meta);
 								
-								if(blockCount != null && blockId != blockIdAir )
+								if(blockCount != null)
 								{
-									if(blockId >= SchematicLoader.maxBlockId && ModSchematicBuilder.debug)
+									if(blockId < 0 || blockId >= SchematicLoader.maxBlockId && ModSchematicBuilder.debug)
 										throw new Exception("Got block with block ID: " + blockId + ", above maximum: " + SchematicLoader.maxBlockId);
 									
 									short index = (short) ((blockId << 4) | meta);
@@ -307,7 +318,7 @@ public class Schematic {
 									if(count != null)
 										blockCount.get(index).increment();
 									else
-										blockCount.put(index, new MutableInt(0));
+										blockCount.put(index, new MutableInt(1));
 								}
 							}
 						}

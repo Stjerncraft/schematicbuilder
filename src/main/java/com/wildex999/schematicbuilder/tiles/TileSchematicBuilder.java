@@ -1,41 +1,24 @@
 package com.wildex999.schematicbuilder.tiles;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
-
-import cpw.mods.fml.common.Optional;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.ResourceEntry;
@@ -46,13 +29,9 @@ import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
 import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.config.StorageDirectories;
-import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
-import com.wildex999.schematicbuilder.exceptions.ExceptionSave;
+import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
 import com.wildex999.schematicbuilder.gui.IGuiWatchers;
 import com.wildex999.schematicbuilder.inventory.InventorySchematicBuilder;
-import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
-import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder.GUI;
-import com.wildex999.schematicbuilder.gui.GuiSchematicBuilderResources;
 import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder;
 import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder.ActionType;
 import com.wildex999.schematicbuilder.network.MessageBase;
@@ -65,39 +44,31 @@ import com.wildex999.schematicbuilder.schematic.SchematicLoader;
 import com.wildex999.schematicbuilder.schematic.SchematicLoaderService;
 import com.wildex999.schematicbuilder.schematic.SchematicLoaderService.Result;
 import com.wildex999.schematicbuilder.schematic.SchematicMap;
-import com.wildex999.utils.FileChooser;
 import com.wildex999.utils.ModLog;
 
+import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
 import cpw.mods.fml.common.registry.GameData;
-import cpw.mods.fml.relauncher.FMLInjectionData;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import cpw.mods.fml.server.FMLServerHandler;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
 import net.minecraft.inventory.IInventory;
-import net.minecraft.inventory.InventoryBasic;
-import net.minecraft.item.Item;
+import net.minecraft.inventory.ISidedInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.tileentity.TileEntityFlowerPot;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
-import net.minecraft.world.World;
-import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.common.util.ForgeDirection;
 
 @Optional.Interface(iface = "cofh.api.energy.IEnergyHandler", modid = "CoFHAPI|energy")
-public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IConfigListener, cofh.api.energy.IEnergyHandler {
+public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IConfigListener, ISidedInventory, cofh.api.energy.IEnergyHandler {
 
 	protected final static String inventoryName = "Schematic Builder";
 	
@@ -115,33 +86,38 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	public static class Config {
 		public int passCount = 2;
 		public boolean placeFloor;
-		public SchematicBlock floorBlock = new SchematicBlock(Blocks.dirt, (byte)0); //Floor to place below Schematic(If not air, moves build up by one)
+		//Floor to place below Schematic(If not air, moves build up by one)
+		public ResourceItem floorBlock = new ResourceItem((short)0, (byte)0, ModSchematicBuilder.resourceManager.getOrCreate(Blocks.dirt, (byte)0));
 		public boolean placeAir = true;
 		
 		public void toBytes(ByteBuf buf) {
 			buf.writeInt(passCount);
 			buf.writeBoolean(placeFloor);
-			buf.writeInt(floorBlock.getSchematicBlockId());
-			buf.writeByte(floorBlock.getSchematicMeta());
+			floorBlock.toBytes(buf);
 			buf.writeBoolean(placeAir);
 		}
 		
 		public void fromBytes(ByteBuf buf) {
 			passCount = buf.readInt();
 			placeFloor = buf.readBoolean();
-			Block floorBlockTemp = Block.getBlockById(buf.readInt());
-			byte floorBlockMeta = buf.readByte();
-			floorBlock = new SchematicBlock(floorBlockTemp, floorBlockMeta);
+			floorBlock = ResourceItem.fromBytes(buf);
+			if(floorBlock == null)
+				floorBlock = new ResourceItem((short)0, (byte)0, ResourceEntry.Unknown);
 			placeAir = buf.readBoolean();
 		}
 		
 	    public void writeToNBT(NBTTagCompound nbt)
 	    {
 			nbt.setInteger("passCount", passCount);
+			
 			nbt.setBoolean("placeFloor", placeFloor);
 			if(floorBlock != null)
-				nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(Block.blockRegistry.getObjectById(floorBlock.getSchematicBlockId())));
-			nbt.setByte("floorBlockMeta", floorBlock.getSchematicMeta());
+				nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(Block.blockRegistry.getObjectById(floorBlock.getBlockId())));
+			nbt.setByte("floorBlockMeta", floorBlock.getMeta());
+			nbt.setInteger("floorBlocksCount", floorBlock.blockCount);
+			nbt.setInteger("floorBlocksPlaced", floorBlock.placedCount);
+			nbt.setInteger("floorBlocksStored", floorBlock.storedCount);
+			
 			nbt.setBoolean("placeAir", placeAir);
 	    }
 	    
@@ -155,13 +131,17 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			{
 				Block floorBlockTemp = tile.blockRegistry.getObjectById(floorBlockId);
 				byte floorBlockMeta = nbt.getByte("floorBlockMeta");
-				floorBlock = new SchematicBlock(floorBlockTemp, floorBlockMeta);
+				int blockCount = nbt.getInteger("floorBlocksCount");
+				int placedCount = nbt.getInteger("floorBlocksPlaced");
+				int storedCount = nbt.getInteger("floorBlocksStored");
+				ResourceEntry entry = ModSchematicBuilder.resourceManager.getOrCreate(floorBlockTemp, floorBlockMeta);
+				floorBlock = new ResourceItem((short)0, (byte)0, entry, blockCount, placedCount, storedCount);
 			}
 			else
 			{
 				ModLog.logger.warn("Unable to get Block id for floor Block: " + floorBlock);
 				//TODO: Mark warning on the floor to inform player of error
-				floorBlock = null;
+				floorBlock = new ResourceItem((short)0, (byte)0, ResourceEntry.Unknown);
 			}
 			placeAir = nbt.getBoolean("placeAir");
 	    }
@@ -384,6 +364,17 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			inventory.setInventorySlotContents(inventorySlotInput, null);
 			return false;
 		}
+		
+		
+		//Consume for Floor
+		ResourceItem floor = config.floorBlock;
+		if(floor != null && floor.getItem() != null && floor.getItem().getItem() == item.getItem()) {
+			if(floor.getMeta() == item.getItemDamage() || floor.canIgnoreMeta()) {
+				if(serverConsumeInputItem(floor, item))
+					return true;
+			}
+		}
+		
 
 		List<ResourceEntry> entryList = ModSchematicBuilder.resourceManager.getItemMapping(item.getItem());
 		if(entryList == null)
@@ -398,31 +389,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				continue; //No resources using entry
 			
 			for(ResourceItem resource : resourceList) {
-				int required = (int) Math.floor((resource.blockCount - resource.placedCount - resource.storedCount) * resource.getItemCostPerBlock());
-				if(required <= 0)
-					continue;
-				
-				if(required >= item.stackSize)
-				{
-					inventory.setInventorySlotContents(inventorySlotInput, null);
-					System.out.println("Consume Stack. Pre: " + resource.storedCount);
-					resource.storedCount += Math.ceil(item.stackSize/resource.getItemCostPerBlock());
-					System.out.println("Consume Stack. Post: " + resource.storedCount);
-					resourceUpdates.add(resource); //Inform clients of change
-					
-					return true; //We only consume once per tick
-				}
-				else
-				{
-					System.out.println("Bite Stack. Pre: stackSize " + item.stackSize + " Stored: " + resource.storedCount);
-					resource.storedCount += Math.ceil(required/resource.getItemCostPerBlock());
-					item.stackSize -= required;
-					System.out.println("Bite Stack. Post: stackSize " + item.stackSize + " Stored: " + resource.storedCount);
-					inventory.setInventorySlotContents(inventorySlotInput, item); //Make sure inventory updates
-					resourceUpdates.add(resource); //Inform clients of change
-					
-					return true; //We only consume once per tick
-				}
+				if(serverConsumeInputItem(resource, item))
+					return true;
 			}
 		}
 		
@@ -431,6 +399,36 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		inventory.setInventorySlotContents(inventorySlotInput, null);
 		
 		return true;
+	}
+	
+	private boolean serverConsumeInputItem(ResourceItem resource, ItemStack item) {
+		int required = (int) Math.floor((resource.blockCount - resource.placedCount - resource.storedCount) * resource.getItemCostPerBlock());
+		if(required <= 0)
+			return false;
+		
+		if(required >= item.stackSize)
+		{
+			inventory.setInventorySlotContents(inventorySlotInput, null);
+			//System.out.println("Consume Stack. Pre: " + resource.storedCount);
+			resource.storedCount += Math.ceil(item.stackSize/resource.getItemCostPerBlock());
+			//System.out.println("Consume Stack. Post: " + resource.storedCount);
+			if(resource != config.floorBlock)
+				resourceUpdates.add(resource); //Inform clients of change
+			
+			return true; //We only consume once per tick
+		}
+		else
+		{
+			//System.out.println("Bite Stack. Pre: stackSize " + item.stackSize + " Stored: " + resource.storedCount);
+			resource.storedCount += Math.ceil(required/resource.getItemCostPerBlock());
+			item.stackSize -= required;
+			//System.out.println("Bite Stack. Post: stackSize " + item.stackSize + " Stored: " + resource.storedCount);
+			inventory.setInventorySlotContents(inventorySlotInput, item); //Make sure inventory updates
+			if(resource != config.floorBlock)
+				resourceUpdates.add(resource); //Inform clients of change
+			
+			return true; //We only consume once per tick
+		}
 	}
 	
 	//Take item from the output queue and put them into the output slot
@@ -529,6 +527,20 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				
 				return;
 			}
+			
+			
+			//Calculate Floor counts
+			ResourceItem floor = config.floorBlock;
+			if(loadedSchematic != null) {
+				floor.blockCount = loadedSchematic.getWidth() * loadedSchematic.getLength();
+				floor.placedCount = 0;
+			}
+			else {
+				floor.blockCount = 0;
+				floor.placedCount = 0;
+			}
+
+			System.out.println("CALCULATED: " + floor.blockCount);
 			
 			//Cache uploaded schematic
 			if(!saveLoadedSchematic())
@@ -695,6 +707,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		boolean needMaterial = false;
 		String missingBlocks = null;
 		boolean wasAir; //Check if any block was placed(Was Air if none placed)
+		boolean isFloor = false; //Floor is a special case
 		
 		do {
 			int x = buildX + lastX;
@@ -705,7 +718,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			if(lastY >= 0)
 				block = loadedSchematic.getBlock(lastX, lastY, lastZ);
 			else
-				block = config.floorBlock;
+			{
+				block = new SchematicBlock(config.floorBlock.getBlockId(), config.floorBlock.getMeta());
+				isFloor = true;
+			}
 			
 			if(block == null)
 			{
@@ -720,7 +736,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			
 			//Check if we have the resources to place
 			ResourceItem resource = null;
-			if(block != config.floorBlock)
+			if(!isFloor)
 			{
 				resource = ResourceManager.getResource(this.resources, block.getSchematicBlockId(), block.getSchematicMeta());
 				if(resource == null)
@@ -734,8 +750,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			}
 			else
 			{
-				newBlock = Block.getBlockById(block.getSchematicBlockId()); //Floor block
-				meta = block.getSchematicMeta();
+				resource = config.floorBlock;
+				newBlock = config.floorBlock.getBlock();
+				System.out.println("FloorBlock: " + newBlock.getLocalizedName());
+				meta = config.floorBlock.getMeta();
 			}
 			
 			
@@ -747,7 +765,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				if(newBlock != Blocks.air  || config.placeAir)
 				{
 					if(ModSchematicBuilder.useEnergy) { //Energy
-						if(energyStorage.getEnergyStored() < energyCostPlace)
+						if(!this.isCreative && energyStorage.getEnergyStored() < energyCostPlace)
 						{
 							needEnergy = true;
 							break;
@@ -773,7 +791,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 									if(!this.isCreative && resource.storedCount <= 0)
 									{
 										needMaterial = true;
-										missingBlocks = Block.blockRegistry.getNameForObject(resource.getBlock()) + "(" + resource.getMeta() + ")";
+										missingBlocks = resource.getBlock().getLocalizedName() + "(" + Block.blockRegistry.getNameForObject(resource.getBlock()) + ":" + resource.getMeta() + ")";
 										break;
 									}
 									resource.storedCount--;
@@ -808,7 +826,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				{
 					if(ModSchematicBuilder.useEnergy)
 					{
-						if(energyStorage.getEnergyStored() < energyCostPlace*energyModifierPass2)
+						if(!this.isCreative && energyStorage.getEnergyStored() < energyCostPlace*energyModifierPass2)
 						{
 							needEnergy = true;
 							break;
@@ -824,7 +842,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 							if(!this.isCreative && resource.storedCount <= 0)
 							{
 								needMaterial = true;
-								missingBlocks = Block.blockRegistry.getNameForObject(resource.getBlock()) + "(" + resource.getMeta() + ")";
+								missingBlocks = resource.getBlock().getLocalizedName() + "(" + Block.blockRegistry.getNameForObject(resource.getBlock()) + ":" + resource.getMeta() + ")";
 								break;
 							}
 							resource.storedCount--;
@@ -926,7 +944,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			}
 			
 			placedCount++;
-			System.out.println("PLACED: " + placedCount);
 			if(state != BuilderState.BUILDING)
 				stateContinue(false);
 		} while(airRepeat-- > 0 && wasAir);
@@ -966,7 +983,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	
 	public void stateMissingMaterial(boolean send, String blockName) {
 		state = BuilderState.NEEDRESOURCES;
-		message = "Blocks: " + blockName;
+		message = blockName;
 		if(send)
 			sendNetworkUpdateMessage(null);
 	}
@@ -1277,7 +1294,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			energyMax = energyStorage.getMaxEnergyStored();
 		}
 		
-		MessageBase netMessage = new MessageUpdateSchematicBuilder(this, energyCurrent, energyMax, resourceUpdates);
+		MessageBase netMessage = new MessageUpdateSchematicBuilder(this, energyCurrent, energyMax, resourceUpdates, config.floorBlock.placedCount, config.floorBlock.storedCount);
 		
 		if(player == null)
 		{
@@ -1421,12 +1438,15 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 	
 	@SideOnly(Side.CLIENT)
-	public void networkUpdateResource(int energyCurrent, int energyMax, ArrayList<ResourceItem> resources) {
+	public void networkUpdateResource(int energyCurrent, int energyMax, ArrayList<ResourceItem> resources, int floorPlaced, int floorStored) {
 		if(ModSchematicBuilder.useEnergy)
 		{
 			energyStorage.setCapacity(energyMax);
 			energyStorage.setEnergyStored(energyCurrent);
 		}
+		
+		config.floorBlock.placedCount = floorPlaced;
+		config.floorBlock.storedCount = floorStored;
 
 		//Resources
 		for(ResourceItem item : resources) {
@@ -1796,7 +1816,27 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		{
 			if(state != BuilderState.BUILDING && state != BuilderState.STOPPED && state != BuilderState.NEEDRESOURCES)
 			{
-				this.config.floorBlock = config.floorBlock;
+				//Transfer over values
+				ResourceItem floor = config.floorBlock;
+				floor.blockCount = this.config.floorBlock.blockCount;
+				floor.placedCount = this.config.floorBlock.placedCount;
+				//If not the same Item, push it to output
+				if(floor.getItem().getItem() != this.config.floorBlock.getItem().getItem())
+				{
+					while(this.config.floorBlock.storedCount > 0) {
+						ItemStack outStack = this.config.floorBlock.getItem().copy();
+						float itemCount = this.config.floorBlock.storedCount*this.config.floorBlock.getItemCostPerBlock();
+						outStack.stackSize = (int) Math.min(64, Math.floor(itemCount));
+						if(itemCount >= 1.0)
+							this.config.floorBlock.storedCount -= Math.ceil(outStack.stackSize/this.config.floorBlock.getItemCostPerBlock());
+						else if(itemCount > 0.0)
+							this.config.floorBlock.storedCount -= 1; //Make sure we don't get suck at a float between 0.0 and 1.0
+						outputQueue.push(outStack);
+					}
+				}
+				else //Carry over stored
+					floor.storedCount = this.config.floorBlock.storedCount;
+				this.config.floorBlock = floor;
 			}
 		}
 		if(this.config.placeAir != config.placeAir)
@@ -2036,7 +2076,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 					continue;
 				}
 				
-				resourceEntry = ModSchematicBuilder.resourceManager.getOrCreate(Block.blockRegistry.getNameForObject(block), meta);
+				resourceEntry = ModSchematicBuilder.resourceManager.getOrCreate(block, meta);
 			}
 			else
 			{
@@ -2049,7 +2089,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			if(mapping.blockId != 0)
 				item.storedCount = 0;
 			else
-				item.storedCount = count; //We always have enough air
+				item.storedCount = Integer.MAX_VALUE; //We always have enough air
 			ResourceManager.setResource(resources,resourcesBackMap, item);
 		}
 		
@@ -2066,6 +2106,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		if(loadedSchematic == null || item == null || item.getItem() == null)
 			return false;
 
+		//Floor check
+		if(config.floorBlock.getItem().getItem() == item.getItem())
+		{
+			if(config.floorBlock.getMeta() == item.getItemDamage() || config.floorBlock.canIgnoreMeta())
+				return true;
+		}
+		
 		List<ResourceEntry> entryList = ModSchematicBuilder.resourceManager.getItemMapping(item.getItem());
 		if(entryList == null)
 			return false;
@@ -2138,6 +2185,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			System.err.println("Loading incompatible TileEntity version for TileSchematicBuilder. Expected version: " + tileVersion + ", saved: " + version+ ". Data might be lost!");
 			//For now we allow it to continue loading, hoping it will go well
 		}
+		
+		this.isCreative = nbt.getBoolean("isCreative");
 		
 		//Read state and progress
 		BuilderState prevState = state.fromValue(nbt.getInteger("state"));
@@ -2254,6 +2303,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		nbt.setInteger("currentPass", currentPass);
 		nbt.setString("message", message);
 		
+		nbt.setBoolean("isCreative", this.isCreative);
+		
 		config.writeToNBT(nbt);
 		inventory.writeToNBT(nbt);
 		
@@ -2327,6 +2378,83 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		energyCostNOP = mod.configGeneral.builderEnergyCostNOP;
 		energyCostPlace = mod.configGeneral.builderEnergyCostPlace;
 		energyModifierPass2 = mod.configGeneral.builderEnergyModifierPass2;
+	}
+
+	
+	//Inventory, so we get recognized by things like Hoppers
+	@Override
+	public int getSizeInventory() {
+		return inventory.getSizeInventory();
+	}
+
+	@Override
+	public ItemStack getStackInSlot(int slotIndex) {
+		return inventory.getStackInSlot(slotIndex);
+	}
+
+	@Override
+	public ItemStack decrStackSize(int slotIndex, int count) {
+		return inventory.decrStackSize(slotIndex, count);
+	}
+
+	@Override
+	public ItemStack getStackInSlotOnClosing(int slotIndex) {
+		return inventory.getStackInSlotOnClosing(slotIndex);
+	}
+
+	@Override
+	public void setInventorySlotContents(int slotIndex, ItemStack item) {
+		inventory.setInventorySlotContents(slotIndex, item);
+	}
+
+	@Override
+	public String getInventoryName() {
+		return inventory.getInventoryName();
+	}
+
+	@Override
+	public boolean hasCustomInventoryName() {
+		return inventory.hasCustomInventoryName();
+	}
+
+	@Override
+	public int getInventoryStackLimit() {
+		return inventory.getInventoryStackLimit();
+	}
+
+	@Override
+	public boolean isUseableByPlayer(EntityPlayer player) {
+		return inventory.isUseableByPlayer(player);
+	}
+
+	@Override
+	public void openInventory() {
+		inventory.openInventory();
+	}
+
+	@Override
+	public void closeInventory() {
+		inventory.closeInventory();
+	}
+
+	@Override
+	public boolean isItemValidForSlot(int slotIndex, ItemStack item) {
+		return inventory.isItemValidForSlot(slotIndex, item);
+	}
+
+	@Override
+	public int[] getAccessibleSlotsFromSide(int side) {
+		return inventory.getAccessibleSlotsFromSide(side);
+	}
+
+	@Override
+	public boolean canInsertItem(int slot, ItemStack item, int side) {
+		return inventory.canInsertItem(slot, item, side);
+	}
+
+	@Override
+	public boolean canExtractItem(int slot, ItemStack item, int side) {
+		return inventory.canExtractItem(slot, item, side);
 	}
 	
 }

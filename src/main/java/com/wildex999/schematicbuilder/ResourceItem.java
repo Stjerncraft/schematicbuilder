@@ -22,14 +22,22 @@ public class ResourceItem {
 	
 	public int placedCount; //Number of Blocks of this resource that have been placed
 	public int blockCount; //Number of Blocks of this resource that exists in the Schematic
-	public int storedCount; //Number of items for this Resource that has been stored for use when placing
+	public int storedCount; //Number of Blocks for this Resource that has been stored for use when placing
 	
 	public boolean valid; //Set to false when removed from mapping(Used mostly by client GUI)
 	
 	public ResourceItem(short schematicBlockId, byte schematicMeta, ResourceEntry entry) {
+		this(schematicBlockId, schematicMeta, entry, 0, 0, 0);
+	}
+
+	public ResourceItem(short schematicBlockId, byte schematicMeta, ResourceEntry entry, int count, int placed, int stored) {
 		this.resourceEntry = entry;
 		this.schematicBlockId = schematicBlockId;
 		this.schematicMeta = schematicMeta;
+		
+		this.blockCount = count;
+		this.placedCount = placed;
+		this.storedCount = stored;
 		
 		valid = true;
 	}
@@ -40,6 +48,10 @@ public class ResourceItem {
 	
 	public boolean isBanned() {
 		return resourceEntry == ResourceEntry.Banned;
+	}
+	
+	public boolean canIgnoreMeta() {
+		return resourceEntry.ignoreItemMeta;
 	}
 	
 	public Block getBlock() {
@@ -68,6 +80,10 @@ public class ResourceItem {
 	
 	public byte getSchematicMeta() {
 		return schematicMeta;
+	}
+	
+	public ResourceEntry getEntry() {
+		return resourceEntry;
 	}
 	
 	//public void setEntry(ResourceEntry entry) NO: A Resource should be immutable once created, or else the maps will be corrupt

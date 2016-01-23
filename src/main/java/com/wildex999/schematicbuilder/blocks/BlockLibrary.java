@@ -8,11 +8,13 @@ import net.minecraft.item.ItemBlock;
 public class BlockLibrary {
 	
 	public static BlockSchematicBuilder schematicBuilder;
+	public static BlockCreativeSchematicBuilder creativeSchematicBuilder;
 	public static BlockUnknown unknown;
 	
 	public static void init()
 	{
-		schematicBuilder = new BlockSchematicBuilder();
+		schematicBuilder = new BlockSchematicBuilder(true);
+		creativeSchematicBuilder = new BlockCreativeSchematicBuilder();
 		unknown = new BlockUnknown();
 	}
 	

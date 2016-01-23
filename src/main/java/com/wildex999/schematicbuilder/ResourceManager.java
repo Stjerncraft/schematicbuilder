@@ -56,6 +56,10 @@ public class ResourceManager implements IConfigListener{
 		return entry;
 	}
 	
+	public ResourceEntry getOrCreate(Block block, byte meta) {
+		return getOrCreate(Block.blockRegistry.getNameForObject(block), meta);
+	}
+	
 	//Get the Resource Entry for the given block and metadata
 	//Returns null if no entry matching entry exists
 	public ResourceEntry getEntry(String blockName, byte meta)

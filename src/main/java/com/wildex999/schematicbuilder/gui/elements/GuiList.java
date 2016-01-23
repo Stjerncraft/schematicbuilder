@@ -2,6 +2,7 @@ package com.wildex999.schematicbuilder.gui.elements;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -44,10 +45,11 @@ public class GuiList extends Gui {
 	//GuiListEntry has an internal linked list
 	protected TreeMap<String, GuiListEntry> list;
 	protected TreeMap<String, GuiListEntry> searchList; //sublist of list used when searching/filtering
-	protected HashMap<String, HashSet<GuiListEntry>> tagList; //Tags and entries containing each tag
+	protected TreeMap<String, HashSet<GuiListEntry>> tagList; //Tags and entries containing each tag
 	
-	protected String prevSearch; 
-	protected boolean prevIgnoreCase;
+	public String prevSearch; 
+	public boolean prevIgnoreCase;
+	public List<String> prevFilterTags;
 	
 	protected int scrollbarPosX, scrollbarPosY;
 	protected int scrollbarWidth;
@@ -69,7 +71,7 @@ public class GuiList extends Gui {
 	public GuiList(GuiScreen screen, int x, int y, int width, int height) {
 		list = new TreeMap<String, GuiListEntry>(String.CASE_INSENSITIVE_ORDER);
 		searchList = new TreeMap<String, GuiListEntry>(String.CASE_INSENSITIVE_ORDER);
-		tagList = new HashMap<String, HashSet<GuiListEntry>>();
+		tagList = new TreeMap<String, HashSet<GuiListEntry>>(String.CASE_INSENSITIVE_ORDER);
 
 		prevSearch = "";
 		prevIgnoreCase = false;
@@ -139,12 +141,30 @@ public class GuiList extends Gui {
 	    return false;
 	}
 	
+	//Add a tag to the given Entry
+	public void addTag(GuiListEntry entry, String tag) {
+		HashSet<GuiListEntry> tagEntries = tagList.get(tag);
+		if(tagEntries == null) {
+			tagEntries = new HashSet<GuiListEntry>();
+			tagList.put(tag, tagEntries);
+		}
+		tagEntries.add(entry);
+	}
+	
+	//Remove a tag from the given Entry, return true if it was removed
+	public boolean removeTag(GuiListEntry entry, String tag) {
+		HashSet<GuiListEntry> tagEntries = tagList.get(tag);
+		if(tagEntries != null)
+			return tagEntries.remove(entry);
+		return false;
+	}
+	
 	//Filter input to any entry whose name matches search
 	//first entry if currently looking outside search area
-	public void setSearchString(String search, boolean ignoreCase) {
-		if(search.length() == 0)
+	public void setSearchString(String search, String[] filterTags, boolean ignoreCase) {
+		System.out.println("Search: " + search + " Filter: " + filterTags);
+		if(search.length() == 0 && (filterTags == null || filterTags.length == 0))
 		{
-			searchList.clear();
 			prevSearch = "";
 			prevIgnoreCase = ignoreCase;
 			
@@ -177,13 +197,29 @@ public class GuiList extends Gui {
 			return;
 		}
 		
-		//TODO: Make the search happen in steps doing x entries each time or just use threads
+		searchList.clear();
 		TreeMap<String, GuiListEntry> currentList = list;
 		
-		if(search.length() >= prevSearch.length() && prevSearch.equals(search.substring(0, search.length())) && ignoreCase == prevIgnoreCase)
-			currentList = searchList; //Continue search on current filtered list
-		else
-			searchList.clear(); //Restart search on full list
+		//Filter tags first
+		if(filterTags != null && filterTags.length > 0) {
+			currentList = new TreeMap<String, GuiListEntry>();
+			for(String tag : filterTags) {
+				tag = tag.trim();
+				SortedMap<String, HashSet<GuiListEntry>> subMap = tagList.subMap(tag, tag + "\uFFFF");
+				for(Entry<String, HashSet<GuiListEntry>> entry : subMap.entrySet()) {
+					for(GuiListEntry listEntry : entry.getValue())
+						currentList.put(listEntry.name, listEntry);
+				}
+			}
+		}
+		
+		//TODO: Make the search happen in steps doing x entries each time or just use threads
+		
+		//TODO: Allow continuation instead of redoing the whole list
+		//if(prevSearch.length() > 0 && search.length() >= prevSearch.length() && prevSearch.equals(search.substring(0, prevSearch.length())) && ignoreCase == prevIgnoreCase)
+			//currentList = searchList; //Continue search on current filtered list
+		//else
+			//searchList.clear(); //Restart search on full list
 		
 		//First see if current selection is in search results
 		if(selectedEntry != null)
@@ -206,28 +242,33 @@ public class GuiList extends Gui {
 			}
 		}
 
-		Set<Entry<String, GuiListEntry>> listSet = currentList.entrySet();
-		for(Map.Entry<String, GuiListEntry> entry : listSet)
+		if(search.length() > 0)
 		{
-			String name = entry.getKey();
-			
-			boolean contains;
-			if(ignoreCase)
-				contains = containsIgnoreCase(name, search);
-			else
-				contains = name.contains(search);
-			
-			if(contains)
+			Set<Entry<String, GuiListEntry>> entrySet = currentList.entrySet();
+			for(Entry<String, GuiListEntry> entry : entrySet)
 			{
-				searchList.put(name, entry.getValue());
+				String name = entry.getKey();
 				
-				if(selectedEntry != null)
+				boolean contains;
+				if(ignoreCase)
+					contains = containsIgnoreCase(name, search);
+				else
+					contains = name.contains(search);
+				
+				if(contains)
 				{
-					if(name.compareToIgnoreCase(selectedEntry.name) < 0)
-						selectedEntryIndex++;
+					searchList.put(name, entry.getValue());
+					
+					if(selectedEntry != null)
+					{
+						if(name.compareToIgnoreCase(selectedEntry.name) < 0)
+							selectedEntryIndex++;
+					}
 				}
 			}
 		}
+		else
+			searchList = currentList;
 		
 		if(selectedEntry != null)
 			setTopEntry(selectedEntry, selectedEntryIndex);
@@ -235,7 +276,7 @@ public class GuiList extends Gui {
 			setTopEntry(searchList.firstEntry().getValue(), 0);
 		else
 			setTopEntry(null, 0);
-		
+		System.out.println("List: " + getCurrentList() + " SearchList: " + searchList);
 		prevSearch = search;
 		prevIgnoreCase = ignoreCase;
 	}

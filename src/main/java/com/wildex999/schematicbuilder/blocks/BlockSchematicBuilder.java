@@ -26,7 +26,7 @@ import net.minecraft.world.World;
 public class BlockSchematicBuilder extends BlockBase {
 	public final String name = "Schematic Builder";
 	
-	public BlockSchematicBuilder()
+	public BlockSchematicBuilder(boolean register)
 	{
 		this.setBlockName(name);
 		this.setHardness(1f);
@@ -34,8 +34,10 @@ public class BlockSchematicBuilder extends BlockBase {
 		this.setCreativeTab(CreativeTabs.tabBlock);
 		this.setStepSound(Block.soundTypeMetal);
 		
-		BlockLibrary.register(this, ItemSchematicBuilder.class);
-		registerTile(TileSchematicBuilder.class);
+		if(register) {
+			BlockLibrary.register(this, ItemSchematicBuilder.class);
+			registerTile(TileSchematicBuilder.class);
+		}
 	}
 	
 	@Override

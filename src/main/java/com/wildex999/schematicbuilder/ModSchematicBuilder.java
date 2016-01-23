@@ -15,6 +15,7 @@ import com.wildex999.schematicbuilder.config.ConfigurationManagerGeneral;
 import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.gui.GuiHandler;
 import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder;
+import com.wildex999.schematicbuilder.items.ItemLibrary;
 import com.wildex999.schematicbuilder.network.MessageUploadSchematic;
 import com.wildex999.schematicbuilder.network.Networking;
 import com.wildex999.schematicbuilder.schematic.SchematicLoader;
@@ -71,6 +72,7 @@ public class ModSchematicBuilder implements IConfigListener{
     	
     	Networking.init();
     	BlockLibrary.init();
+    	ItemLibrary.init();
     	proxy.initialize();
     	
     	onConfigReload(configGeneral);
