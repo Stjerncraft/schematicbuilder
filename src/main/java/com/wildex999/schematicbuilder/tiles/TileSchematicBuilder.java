@@ -539,8 +539,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				floor.blockCount = 0;
 				floor.placedCount = 0;
 			}
-
-			System.out.println("CALCULATED: " + floor.blockCount);
 			
 			//Cache uploaded schematic
 			if(!saveLoadedSchematic())
@@ -1146,7 +1144,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		uploadAfterLoad = true;
 		cacheAfterLoad = false;
 		
-		//TODO: Populate resources from Server(As they might have been swapped)
 		HashMap<Short, MutableInt> blockCount = new HashMap<Short, MutableInt>();
 		loadSchematicWork = SchematicLoaderService.instance.loadFile(loadFileLocal, blockCount);
 		if(loadSchematicWork == null)
@@ -1197,6 +1194,12 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	@SideOnly(Side.CLIENT)
 	public void sendConfigToServer() {
 		MessageBase msg = new MessageActionSchematicBuilder(this, config);
+		msg.sendToServer();
+	}
+	
+	@SideOnly(Side.CLIENT)
+	public void sendResourceSwapToServer(ResourceItem resource) {
+		MessageBase msg = new MessageActionSchematicBuilder(this, resource);
 		msg.sendToServer();
 	}
 	
@@ -1294,7 +1297,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			energyMax = energyStorage.getMaxEnergyStored();
 		}
 		
-		MessageBase netMessage = new MessageUpdateSchematicBuilder(this, energyCurrent, energyMax, resourceUpdates, config.floorBlock.placedCount, config.floorBlock.storedCount);
+		ArrayList<ResourceItem> ru = new ArrayList<ResourceItem>(resourceUpdates);
+		resourceUpdates.clear();
+		MessageBase netMessage = new MessageUpdateSchematicBuilder(this, energyCurrent, energyMax, ru, config.floorBlock.placedCount, config.floorBlock.storedCount);
 		
 		if(player == null)
 		{
@@ -1450,7 +1455,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 
 		//Resources
 		for(ResourceItem item : resources) {
-			ResourceItem resource = ResourceManager.getResource(this.resources, item.getSchematicBlockId(), item.getSchematicMeta());	
+			//ResourceItem resource = ResourceManager.getResource(this.resources, item.getSchematicBlockId(), item.getSchematicMeta());	
 			ResourceManager.setResource(this.resources, this.resourcesBackMap, item); //Will replace old item
 		}
 		
@@ -1822,18 +1827,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				floor.placedCount = this.config.floorBlock.placedCount;
 				//If not the same Item, push it to output
 				if(floor.getItem().getItem() != this.config.floorBlock.getItem().getItem())
-				{
-					while(this.config.floorBlock.storedCount > 0) {
-						ItemStack outStack = this.config.floorBlock.getItem().copy();
-						float itemCount = this.config.floorBlock.storedCount*this.config.floorBlock.getItemCostPerBlock();
-						outStack.stackSize = (int) Math.min(64, Math.floor(itemCount));
-						if(itemCount >= 1.0)
-							this.config.floorBlock.storedCount -= Math.ceil(outStack.stackSize/this.config.floorBlock.getItemCostPerBlock());
-						else if(itemCount > 0.0)
-							this.config.floorBlock.storedCount -= 1; //Make sure we don't get suck at a float between 0.0 and 1.0
-						outputQueue.push(outStack);
-					}
-				}
+					outputResourceStored(this.config.floorBlock);
 				else //Carry over stored
 					floor.storedCount = this.config.floorBlock.storedCount;
 				this.config.floorBlock = floor;
@@ -1844,6 +1838,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			this.config.placeAir = config.placeAir;
 		}
 		
+		markDirty();
 		//Inform watchers about config change
 		sendNetworkUpdateFull(null);
 	}
@@ -1865,11 +1860,36 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		}
 	}
 	
+	//Called when player request swapping Entry for a Resource
+	public void actionSwapResource(EntityPlayerMP player, ResourceItem newResource) {
+		//Get the existing resource and change the Entry
+		ResourceItem resource = ResourceManager.getResource(resources, newResource.getSchematicBlockId(), newResource.getSchematicMeta());
+		if(resource == null) {
+			ModLog.printTileErrorPrefix(this);
+			ModLog.logger.error("Failed to get existing Resource for SchematicBlock: " + newResource.getSchematicBlockId() + ":" + newResource.getMeta());
+			sendNetworkResourcesList(player);
+			return;
+		}
+		
+		//Eject stored before switching and copying over
+		if(resource.getEntry() != newResource.getEntry())
+			outputResourceStored(resource);
+		
+		resource.valid = false;
+		
+		newResource.blockCount = resource.blockCount;
+		newResource.placedCount = resource.placedCount;
+		ResourceManager.setResource(resources, resourcesBackMap, newResource);
+		resourceUpdates.add(newResource);
+		
+		markDirty();
+	}
+	
 	//Reload after Unload
 	public void actionReload() {
 		if(state != BuilderState.UNLOADED)
 			return;
-		//Reload the Schematic if we can
+		//TODO: Reload the Schematic if we can
 		
 	}
 	
@@ -1877,6 +1897,20 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	public void actionDownload(EntityPlayerMP player) {
 		if(ModSchematicBuilder.configGeneral.acceptSendSchematic)
 			startSendSchematic(player);
+	}
+	
+	//Push Stored items for Resource to the output queue
+	public void outputResourceStored(ResourceItem resource) {
+		while(resource.storedCount > 0) {
+			ItemStack outStack = resource.getItem().copy();
+			float itemCount = resource.storedCount*resource.getItemCostPerBlock();
+			outStack.stackSize = (int) Math.min(64, Math.floor(itemCount));
+			if(itemCount >= 1.0)
+				resource.storedCount -= Math.ceil(outStack.stackSize/resource.getItemCostPerBlock());
+			else if(itemCount > 0.0)
+				resource.storedCount -= 1; //Make sure we don't get suck at a float between 0.0 and 1.0
+			outputQueue.push(outStack);
+		}
 	}
 	
 	//Send progress update to all who have requested it
@@ -2089,7 +2123,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			if(mapping.blockId != 0)
 				item.storedCount = 0;
 			else
-				item.storedCount = Integer.MAX_VALUE; //We always have enough air
+				item.storedCount = count; //We always have enough air
+			
 			ResourceManager.setResource(resources,resourcesBackMap, item);
 		}
 		
@@ -2235,15 +2270,20 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		{
 			NBTTagCompound tag = nbtResources.getCompoundTagAt(t);
 			
-			String blockName = tag.getString("blockName");
-			if(blockName.isEmpty())
-				continue;
-			
-			byte meta = tag.getByte("meta");
+			//Schematic Original
 			short schematicBlockId = tag.getShort("schematicBlockId");
 			byte schematicMeta = tag.getByte("schematicMeta");
 			
-			ResourceEntry resourceEntry = ModSchematicBuilder.resourceManager.getOrCreate(blockName, meta);
+			//Entry
+			ResourceEntry resourceEntry;
+			String blockName = tag.getString("entryBlockName");
+			if(blockName.isEmpty()) {
+				//TODO: Check if the entry is now known
+				resourceEntry = ResourceEntry.Unknown;
+			} else {
+				byte meta = tag.getByte("entryMeta");
+				resourceEntry = ModSchematicBuilder.resourceManager.getOrCreate(blockName, meta);
+			}
 			
 			ResourceItem item = new ResourceItem(schematicBlockId, schematicMeta, resourceEntry);
 			item.blockCount = tag.getInteger("count");
@@ -2314,12 +2354,24 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		{
 			if(item == null)
 				continue;
+
 			NBTTagCompound tag = new NBTTagCompound();
 			
+			//Schematic Original
 			tag.setShort("schematicBlockId", item.getSchematicBlockId());
 			tag.setByte("schematicMeta", item.getSchematicMeta());
-			tag.setString("blockName", blockRegistry.getNameForObject(item.getBlock()));
-			tag.setByte("meta", item.getMeta());
+			
+			//Entry
+			String blockName;
+			ResourceEntry entry = item.getEntry();
+			if(entry != ResourceEntry.Unknown)
+				blockName = blockRegistry.getNameForObject(entry.block);
+			else
+				blockName = ""; //Unknown
+			
+			tag.setString("entryBlockName", blockName);
+			tag.setByte("entryMeta", entry.meta);
+			
 			
 			tag.setInteger("placed", item.placedCount);
 			tag.setInteger("count", item.blockCount);

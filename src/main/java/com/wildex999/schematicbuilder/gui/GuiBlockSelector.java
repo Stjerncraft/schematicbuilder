@@ -169,7 +169,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 		
 		if(textFieldSearch.textboxKeyTyped(eventChar, eventKey))
 		{
-			blockList.setSearchString(textFieldSearch.getText(), true);
+			blockList.setSearchString(textFieldSearch.getText(), null, true);
 			blockList.update();
 			return;
 		}

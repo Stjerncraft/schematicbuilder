@@ -9,6 +9,10 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
+import com.wildex999.schematicbuilder.ModSchematicBuilder;
+import com.wildex999.schematicbuilder.ResourceEntry;
+import com.wildex999.schematicbuilder.ResourceItem;
+import com.wildex999.schematicbuilder.ResourceManager;
 import com.wildex999.schematicbuilder.network.MessageUpdateSchematicBuilder.UpdateType;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
@@ -26,7 +30,8 @@ public class MessageActionSchematicBuilder extends MessageBase {
 		STOP(1),
 		CONFIG(2),
 		DOWNLOAD(3),
-		PROGRESS(4); //Player requesting Progress update(Or stop if already watching)
+		PROGRESS(4), //Player requesting Progress update(Or stop if already watching)
+		RESOURCESWAP(5); //Player selected new Entry for Resource
 		
 		private final int value;
 		
@@ -54,6 +59,7 @@ public class MessageActionSchematicBuilder extends MessageBase {
 	private ActionType action;
 	private TileEntityInfo tileInfo;
 	private TileSchematicBuilder.Config config;
+	private ResourceItem resource;
 	
 	//Receive Constructor
 	public MessageActionSchematicBuilder() {
@@ -72,6 +78,13 @@ public class MessageActionSchematicBuilder extends MessageBase {
 		this.config = config;
 	}
 	
+	//Send ResourceSwap constructor
+	public MessageActionSchematicBuilder(TileEntity tile, ResourceItem resource) {
+		tileInfo = new TileEntityInfo(tile);
+		this.action = ActionType.RESOURCESWAP;
+		this.resource = resource;
+	}
+	
 	@Override
 	public void fromBytes(ByteBuf buf) {
 		tileInfo = readTileEntity(buf);
@@ -82,6 +95,26 @@ public class MessageActionSchematicBuilder extends MessageBase {
 			config = new TileSchematicBuilder.Config();
 			config.fromBytes(buf);
 		}
+		else if(action == ActionType.RESOURCESWAP) {
+			short schematicBlockId = buf.readShort();
+			byte schematicMeta = buf.readByte();
+			short serverBlockId = buf.readShort();
+			byte serverMeta = buf.readByte();
+			
+			Block block = (Block) Block.blockRegistry.getObjectById(serverBlockId);
+			if(block == null){
+				throw new RuntimeException("No block for the given BlockID: " + serverBlockId + 
+											", while trying to change Resource Entry! Tile: " + tileInfo.posX + " : " + tileInfo.posY + " : " + tileInfo.posZ);
+			}
+			
+			ResourceEntry entry = ModSchematicBuilder.resourceManager.getEntry(block, serverMeta);
+			if(entry == null) {
+				throw new RuntimeException("No Entry for " + schematicBlockId + ":" + schematicMeta +
+						", while trying to change Resource Entry! Tile: " + tileInfo.posX + " : " + tileInfo.posY + " : " + tileInfo.posZ);
+			}
+			
+			resource = new ResourceItem(schematicBlockId, schematicMeta, entry);
+		}
 	}
 
 	@Override
@@ -91,6 +124,12 @@ public class MessageActionSchematicBuilder extends MessageBase {
 		
 		if(action == ActionType.CONFIG)
 			config.toBytes(buf);
+		else if(action == ActionType.RESOURCESWAP) {
+			buf.writeShort(resource.getSchematicBlockId());
+			buf.writeByte(resource.getSchematicMeta());
+			buf.writeShort(resource.getBlockId());
+			buf.writeByte(resource.getMeta());
+		}
 	}
 	
 	public static class Handler implements IMessageHandler<MessageActionSchematicBuilder, IMessage> {
@@ -120,6 +159,8 @@ public class MessageActionSchematicBuilder extends MessageBase {
         	case PROGRESS:
         		tile.actionProgress(ctx.getServerHandler().playerEntity);
         		break;
+        	case RESOURCESWAP:
+        		tile.actionSwapResource(ctx.getServerHandler().playerEntity, message.resource);
         	}
         	
         	return null;

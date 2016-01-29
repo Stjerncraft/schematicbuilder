@@ -14,7 +14,7 @@ public class GuiListEntrySchematic extends GuiListEntry {
 	public int scWidth, scHeight, scLength;
 	public File file;
 	
-	public GuiListEntrySchematic(String name, String author, int scWidth, int scHeight, int scLength, List<String> tags, File file) {
+	public GuiListEntrySchematic(String name, String author, int scWidth, int scHeight, int scLength, String[] tags, File file) {
 		super(name, tags);
 
 		this.author = author;

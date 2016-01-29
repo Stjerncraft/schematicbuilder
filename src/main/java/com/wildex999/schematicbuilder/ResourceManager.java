@@ -105,6 +105,9 @@ public class ResourceManager implements IConfigListener{
 		short resourceIndex = (short) ((resource.getSchematicBlockId() << 4) | (resource.getSchematicMeta() & 0xF));
 		ResourceItem oldItem = resourceMap.get(resourceIndex);
 		
+		if(oldItem == resource)
+			return;
+		
 		if(oldItem != null)
 			removeResource(resourceMap, backMap, oldItem);
 		

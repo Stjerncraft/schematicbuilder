@@ -37,6 +37,7 @@ import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.ChunkCache;
+import scala.actors.threadpool.Arrays;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.SchematicWorldCache;
@@ -327,14 +328,14 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		String tagsString = textFieldFilterTags.getText();
 		if(textFieldSearch.textboxKeyTyped(eventChar, eventKey))
 		{
-			schematicList.setSearchString(textFieldSearch.getText(), (tagsString.length() > 0 ? tagsString.split(",") : null), searchCaseToggled);
+			schematicList.setSearchString(textFieldSearch.getText(), (tagsString.length() > 0 ? Arrays.asList(tagsString.split(",")) : null), searchCaseToggled);
 			updateGui();
 			return;
 		}
 		else if(textFieldFilterTags.textboxKeyTyped(eventChar, eventKey))
 		{
 			tagsString = textFieldFilterTags.getText();
-			schematicList.setSearchString(textFieldSearch.getText(), (tagsString.length() > 0 ? tagsString.split(",") : null), searchCaseToggled);
+			schematicList.setSearchString(textFieldSearch.getText(), (tagsString.length() > 0 ? Arrays.asList(tagsString.split(",")) : null), searchCaseToggled);
 			updateGui();
 			return;
 		}

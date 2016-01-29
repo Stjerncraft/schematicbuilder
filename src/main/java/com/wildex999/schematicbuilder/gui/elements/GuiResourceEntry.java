@@ -40,9 +40,9 @@ public class GuiResourceEntry extends Gui {
 		labelBlock = new GuiLabel("Block", x, y, GUI.colorText);
 		labelItem = new GuiLabel("Item", x + 130, y, GUI.colorText);
 		
-		labelPlaced = new GuiLabel("", x + 32, y + 10, GUI.colorText);
-		labelStored = new GuiLabel("", x + 32, y + 20, GUI.colorText);
-		labelMissing = new GuiLabel("", x + 32, y + 30, GUI.colorText);
+		labelPlaced = new GuiLabel("", x + 30, y + 10, GUI.colorText);
+		labelStored = new GuiLabel("", x + 30, y + 20, GUI.colorText);
+		labelMissing = new GuiLabel("", x + 30, y + 30, GUI.colorText);
 		
 		
 		blockButton.xPosition = x;

@@ -85,9 +85,11 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	private GuiLabel labelOutput;
 	private GuiLabel labelFilter;
 	
-	private int resourceVersion = 0; //Used to check when to reload Resources from tile
+	private int resourceVersion = -1; //Used to check when to reload Resources from tile
 	private GuiList resourceList;
 	private GuiButtonStretched buttonScrollbar;
+	
+	private GuiListEntryResource resourceEntrySelected;
 	
 	private GuiButtonStretched buttonAll; //Show all Resources
 	private GuiButtonStretched buttonMissing; //Show Resources missing
@@ -133,6 +135,8 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		resourceList = new GuiList(this, 168, 5, 76, 244);
 		resourceList.entryHeight = 26;
 		resourceList.toggleEntries = false;
+		
+		currentTags = tagsAll;
 	}
 	
 	//Add resource to GUI List
@@ -141,10 +145,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		
 		//Add tags
 		for(String tag : listEntry.tags)
-		{
-			System.out.println("Entry: " + listEntry.name + " Tag: " + tag);
 			resourceList.addTag(listEntry, tag);
-		}
 		
 		resourceList.addEntry(listEntry);
 	}
@@ -176,7 +177,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		
 		//Get list of entries to replace(Avoid Concurrent modification)
 		ArrayList<GuiListEntryResource> changeList = new ArrayList<GuiListEntryResource>();
-		for(Map.Entry<String, GuiListEntry> entry : resourceList.getCurrentList().entrySet()) {
+		for(Map.Entry<String, GuiListEntry> entry : resourceList.getFullList().entrySet()) {
 			String name = entry.getKey();
 			GuiListEntryResource resourceEntry = (GuiListEntryResource)entry.getValue();
 
@@ -202,7 +203,11 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		//Modify List
 		for(GuiListEntryResource resourceEntry : changeList) {
 			//Remove old entry, and add new one for same Schematic Block ID & Meta, which should now have a new Resource
+			if(resourceEntrySelected == resourceEntry)
+				resourceEntrySelected = null;
+			
 			resourceList.removeEntry(resourceEntry);
+			System.out.println("Remove: " + resourceEntry);
 			ResourceItem newResource = ResourceManager.getResource(gui.tile.resources, resourceEntry.resource.getSchematicBlockId(), resourceEntry.resource.getSchematicMeta());
 			if(newResource == null)
 			{
@@ -211,6 +216,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 									+ " while updating GUI Resource list.");
 				continue;
 			}
+			System.out.println("Updating resource: " + resourceEntry.resource.getSchematicBlockId() + " -> " + newResource.getSchematicBlockId() + " NewValid: " + newResource.valid);
 			addResource(newResource);
 		}
 		
@@ -219,6 +225,9 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	}
 	
 	public void reloadResources() {
+		if(this.resourceVersion == gui.tile.resourceVersion)
+			return;
+
 		resourceList.clear();
 		
 		//Populate Resource List
@@ -232,37 +241,43 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		}
 		
 		resourceList.update();
+		this.resourceVersion = gui.tile.resourceVersion;
 	}
 	
 	public String getEntryName(ResourceItem resource) {
-		String displayName = null;
+		StringBuilder displayName = new StringBuilder();
 		
 		if(resource.isUnknown() || resource.isBanned())
 		{
 			SchematicMap map = gui.tile.loadedSchematic.getSchematicMap(resource.getSchematicBlockId(), resource.getSchematicMeta(), true);
 			if(map == null)
-				displayName = "Error: No mapping found!(" + resource.getSchematicBlockId() + ":" + resource.getSchematicMeta() + ")";
+				displayName.append("Error: No mapping found!(").append(resource.getSchematicBlockId()).append(":" + resource.getSchematicMeta() + ")");
 			else
 			{
-				displayName = map.schematicBlockName;
-				if(displayName == null || displayName.isEmpty())
-					displayName = map.schematicBlockId + ":" + map.schematicMeta;
+				displayName.append(map.schematicBlockName);
+				if(displayName.length() == 0)
+					displayName.append(map.schematicBlockId + ":").append(map.schematicMeta);
 			}
 		}
 		else if(resource.getBlock() == Blocks.air)
-			displayName = "Air";
+			displayName.append("Air");
 		else if(resource.getItem() != null)
-			displayName = resource.getItem().getDisplayName()+"("+resource.getMeta()+")";
+			displayName.append(resource.getItem().getDisplayName()).append("("+resource.getMeta()+")");
 		else
-			displayName = resource.getBlock().getUnlocalizedName()+"("+resource.getMeta()+")";
+			displayName.append(resource.getBlock().getUnlocalizedName()).append("("+resource.getMeta()+")");
 		
-		return displayName;
+		//Let each entry, even those sharing the same Entry, be unique in the list
+		displayName.append("(").append(resource.getSchematicBlockId()).append(":").append(resource.getSchematicMeta()).append(")");
+		
+		return displayName.toString();
 	}
 	
 	@Override
 	public void onTabActivated() {	
 		//TODO: Only update instead of reload when changing tabs?
 		reloadResources();
+		
+		buttonSelectedResource.enabled = false;
 		
 		gui.container.hidePlayerInventory(false);
 		gui.container.hideInventory(false);
@@ -282,10 +297,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		if(gui.tile.resourceVersion == this.resourceVersion)
 			updateResources();
 		else
-		{
 			reloadResources();
-			this.resourceVersion = gui.tile.resourceVersion;
-		}
 		
 		if(resourceFloor.buttonWasPressed())
 		{
@@ -311,8 +323,27 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 			
 			resourceFloor.setResource(gui.tile.config.floorBlock);
 		}
-		if(resourceSelected.buttonWasPressed()) {
-			//TODO: Update Selected Resource
+		if(resourceSelected.buttonWasPressed() && resourceList.selectedEntry != null) {
+			ItemStack newItem = GuiBlockSelector.selectedItem;
+			System.out.println("TEST1: " + newItem + " : " + resourceEntrySelected);
+			if(newItem != null && resourceEntrySelected != null && resourceEntrySelected.resource != null)
+			{
+				ResourceEntry entry = ModSchematicBuilder.resourceManager.getOrCreate(Block.getBlockFromItem(newItem.getItem()), (byte)newItem.getItemDamage());
+				ResourceItem oldResource = resourceEntrySelected.resource;
+				System.out.println("TEST2: " + entry);
+				if(entry != null) {
+					System.out.println("TEST3");
+					ResourceItem newResource = new ResourceItem(oldResource.getSchematicBlockId(), oldResource.getSchematicMeta(), entry);
+					gui.tile.sendResourceSwapToServer(newResource);
+					
+					//Update client side, assuming it to go through. If not, the server will correct us
+					/*newResource.blockCount = oldResource.blockCount;
+					newResource.placedCount = oldResource.placedCount;
+					newResource.storedCount = oldResource.storedCount; //This will be updated by server
+					ResourceManager.removeResource(gui.tile.resources, gui.tile.resourcesBackMap, oldResource);
+					ResourceManager.setResource(gui.tile.resources, gui.tile.resourcesBackMap, newResource);*/
+				}
+			}
 		}
 		
 		//Set Floor
@@ -330,11 +361,27 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	public void updateScreen() {
 		textFieldSearch.updateCursorCounter();
 		
+		//Check for new selection
+		if(resourceList.selectedEntry != resourceEntrySelected) {
+			resourceEntrySelected = (GuiListEntryResource) resourceList.selectedEntry;
+			
+			if(resourceEntrySelected != null)
+			{
+				resourceSelected.setResource(resourceEntrySelected.resource);
+				buttonSelectedResource.enabled = true;
+			}
+			else
+			{
+				resourceSelected.setResource(null);
+				buttonSelectedResource.enabled = false;
+			}
+		}
+		
+		//Update Resources and other things
 		if(resourceUpdateCounter-- <= 0)
 		{
 			updateGui();
 			resourceUpdateCounter = resourceUpdateRate;
-			System.out.println("Update Gui");
 		}
 	}
 	
@@ -365,19 +412,23 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		resourceFloor = new GuiResourceEntry(this, guiLeft + 5, guiTop + 80, buttonFloorResource, gui.tile.config.floorBlock);
 		
 		buttonSelectedResource = new GuiButtonItem(0, 0, 0, 26, 25, buttonSelectedResource != null ? buttonSelectedResource.getItem() : null, false);
-		resourceSelected = new GuiResourceEntry(this, guiLeft + 5, guiTop + 30, buttonSelectedResource, gui.tile.config.floorBlock);
+		resourceSelected = new GuiResourceEntry(this, guiLeft + 5, guiTop + 30, buttonSelectedResource, resourceEntrySelected != null ? resourceEntrySelected.resource : null);
 		
 		buttonScrollbar = new GuiButtonStretched(0, resourceList.posX + resourceList.width, resourceList.posY + resourceList.height, "");
 		resourceList.setScrollbarButton(buttonScrollbar);
 		
 		//Filtering
 		buttonAll = new GuiButtonStretched(0, guiLeft + 5, guiTop + 143, 45, 12, "All");
-		buttonAll.toggled = true;
+		if(currentTags == tagsAll) buttonAll.toggled = true;
 		buttonMissing = new GuiButtonStretched(0, guiLeft + 50, guiTop + 143, 45, 12, "Missing");
+		if(currentTags == tagsMissing) buttonMissing.toggled = true;
 		buttonUnknown = new GuiButtonStretched(0, guiLeft + 5, guiTop + 155, 45, 12, "Unknown");
+		if(currentTags == tagsUnknown) buttonUnknown.toggled = true;
 		buttonBanned = new GuiButtonStretched(0, guiLeft + 50, guiTop + 155, 45, 12, "Banned");
+		if(currentTags == tagsBanned) buttonBanned.toggled = true;
 		labelFilter = new GuiLabel("Filter", guiLeft + 5, guiTop + 120, gui.colorText);
 		textFieldSearch = new GuiTextField(fontRendererObj, guiLeft + 5, guiTop + 130, 100, 10);
+		textFieldSearch.setText(resourceList.prevSearch);
 		
 		buttonList.add(buttonScrollbar);
 		buttonList.add(buttonFloorResource);
@@ -423,6 +474,15 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	
 	@Override
 	public void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
+		//Draw tooltips
+		ArrayList<String> textList = new ArrayList<String>();
+		
+		if(buttonFloorResource.isOver(mouseX, mouseY) && buttonFloorResource.getItem() != null)
+			textList.add(buttonFloorResource.getItem().getDisplayName());
+		if(buttonSelectedResource.isOver(mouseX, mouseY) && buttonSelectedResource.getItem() != null)
+			textList.add(buttonSelectedResource.getItem().getDisplayName());
+		
+		this.drawHoveringText(textList, mouseX-guiLeft, mouseY-guiTop, fontRendererObj);
 	}
 	
 	@Override
@@ -441,7 +501,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		gui.ignoreKeyboardEvent = true;
 		if(textFieldSearch.textboxKeyTyped(eventChar, eventKey))
 		{
-			resourceList.setSearchString(textFieldSearch.getText(), currentTags, true);
+			resourceList.setSearchString(textFieldSearch.getText(), Arrays.asList(currentTags), true);
 			updateGui();
 			return;
 		}
@@ -504,7 +564,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		} 
 		else if(button == buttonAll || button == buttonMissing || button == buttonBanned || button == buttonUnknown) {
 			setTags(button);
-			resourceList.setSearchString(resourceList.prevSearch, currentTags, true);
+			resourceList.setSearchString(resourceList.prevSearch, Arrays.asList(currentTags), true);
 		}
 		
 	}

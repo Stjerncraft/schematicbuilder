@@ -30,7 +30,7 @@ public class GuiListEntryBlock extends GuiListEntry {
 	public static int colorBgNormal = 0xFF000000;
 	public static int colorBgSelected = 0xFF3DBF1D;
 	
-	public GuiListEntryBlock(String name, List<String> tags, ItemStack item) {
+	public GuiListEntryBlock(String name, String[] tags, ItemStack item) {
 		super(name, tags);
 		this.item = item;
 	}

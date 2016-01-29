@@ -208,7 +208,7 @@ public class Schematic {
 								
 								if(block == null)
 								{
-									buf.writeShort(-1);
+									buf.writeShort(0); //Air
 									continue;
 								}
 								
@@ -269,6 +269,17 @@ public class Schematic {
 			newSchematic.schematicMap.put((map.schematicBlockId << 4) | map.schematicMeta, map);
 		}
 		
+		//Air counting
+		MutableInt airCount = null;
+		if(blockCount != null) {
+			airCount = blockCount.get(0);
+			if(airCount == null)
+			{
+				airCount = new MutableInt(0);
+				blockCount.put((short) 0, airCount);
+			}
+		}
+		
 		//Read Chunks
 		for(int chunkX = 0; chunkX < chunksX; chunkX++)
 		{
@@ -282,11 +293,10 @@ public class Schematic {
 						//Count air
 						if(blockCount != null)
 						{
-							MutableInt count = blockCount.get(0);
-							if(count != null)
-								blockCount.get(0).increment();
-							else
-								blockCount.put((short) 0, new MutableInt(1));
+							int chunkWidth = Math.min(width-(chunkX*chunkSize), chunkSize);
+							int chunkLength = Math.min(length-(chunkZ*chunkSize), chunkSize);
+							int chunkHeight = Math.min(height-(chunkY*chunkSize), chunkSize);
+							airCount.add(chunkWidth*chunkLength*chunkHeight);
 						}
 						continue;
 					}
@@ -300,9 +310,6 @@ public class Schematic {
 							{
 								int data = buf.readShort();
 								
-								if(data == -1)
-									continue;
-								
 								int blockId = (data >> 4) & 0xFFF; //Get left 12 bits
 								byte meta = (byte) (data & 0xF); //Get right 4 bits
 
@@ -310,13 +317,19 @@ public class Schematic {
 								
 								if(blockCount != null)
 								{
+									if(blockId == 0)
+									{
+										airCount.increment();
+										continue;
+									}
+									
 									if(blockId < 0 || blockId >= SchematicLoader.maxBlockId && ModSchematicBuilder.debug)
 										throw new Exception("Got block with block ID: " + blockId + ", above maximum: " + SchematicLoader.maxBlockId);
 									
 									short index = (short) ((blockId << 4) | meta);
 									MutableInt count = blockCount.get(index);
 									if(count != null)
-										blockCount.get(index).increment();
+										count.increment();
 									else
 										blockCount.put(index, new MutableInt(1));
 								}

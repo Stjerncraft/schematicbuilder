@@ -188,6 +188,17 @@ public class SchematicLoader {
         //TODO: Read TileEntities
         //TODO: Read Entities
 
+        //Air counting
+        MutableInt airCount = null;
+        if(blockCount != null) {
+        	airCount = blockCount.get(0);
+			if(airCount == null)
+			{
+				airCount = new MutableInt(0);
+				blockCount.put((short) 0, airCount);
+			}
+        }
+        
         //Store blocks
         for(int x = 0; x < width; x++)
         {
@@ -229,6 +240,12 @@ public class SchematicLoader {
         			
 					if(blockCount != null)
 					{
+						if(blockID == 0)
+						{ //Skip lookup for air
+							airCount.increment();
+							continue;
+						}
+						
 						if(blockID < 0 || blockID >= SchematicLoader.maxBlockId)
 			        		throw new ExceptionInvalid("Invalid block ID: " + blockID + ", is above max Block ID: " + SchematicLoader.maxBlockId +
 			        				". Schematic might be invalid!");

@@ -1,5 +1,6 @@
 package com.wildex999.schematicbuilder.gui.elements;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -75,6 +76,7 @@ public class GuiList extends Gui {
 
 		prevSearch = "";
 		prevIgnoreCase = false;
+		prevFilterTags = new ArrayList<String>();
 		
 		posX = x;
 		posY = y;
@@ -99,10 +101,14 @@ public class GuiList extends Gui {
 	}
 	
 	public TreeMap<String, GuiListEntry> getCurrentList() {
-		if(prevSearch.length() == 0)
+		if(prevSearch.length() == 0 && prevFilterTags.size() == 0)
 			return list;
 		else
 			return searchList;
+	}
+	
+	public TreeMap<String, GuiListEntry> getFullList() {
+		return list;
 	}
 	
 	//The button must be created and given a ID in the parent GuiScreen.
@@ -155,17 +161,32 @@ public class GuiList extends Gui {
 	public boolean removeTag(GuiListEntry entry, String tag) {
 		HashSet<GuiListEntry> tagEntries = tagList.get(tag);
 		if(tagEntries != null)
-			return tagEntries.remove(entry);
+		{
+			if(tagEntries.remove(entry)) {
+				if(tagEntries.size() == 0)
+					tagList.remove(tag);
+				
+				return true;
+			}
+			else
+				System.out.println("Failed to remove tag: " + tag + " from: " + entry.name);
+		}
 		return false;
 	}
 	
 	//Filter input to any entry whose name matches search
 	//first entry if currently looking outside search area
-	public void setSearchString(String search, String[] filterTags, boolean ignoreCase) {
-		System.out.println("Search: " + search + " Filter: " + filterTags);
-		if(search.length() == 0 && (filterTags == null || filterTags.length == 0))
+	public void setSearchString(String search, List<String> filterTags, boolean ignoreCase) {
+		//System.out.println("Search: " + search + " Filter: " + filterTags);
+		
+		if(filterTags == null)
+			filterTags = new ArrayList<String>();
+		
+		searchList.clear();		
+		if(search.length() == 0 && filterTags.size() == 0)
 		{
 			prevSearch = "";
+			prevFilterTags = new ArrayList<String>(); //Clear is unsupported sometimes
 			prevIgnoreCase = ignoreCase;
 			
 			if(list.size() == 0)
@@ -181,8 +202,11 @@ public class GuiList extends Gui {
 				{
 					//Find top to have a starting point and known index
 					topEntry = list.firstEntry().getValue();
-					topEntryIndex = 0;
+					topEntryIndex = 0; //Reset top index for the search
 					topEntryIndex = findEntryIndex(currentTop);
+					if(topEntryIndex < 0)
+						ModLog.logger.error("FAILED TO INDEX TOP: " + currentTop + " Exists in list: " + list.containsKey(currentTop.name));
+					
 					setTopEntry(currentTop, topEntryIndex);
 				}
 				else
@@ -190,25 +214,50 @@ public class GuiList extends Gui {
 				
 				if(selectedEntry != null)
 				{
+					//System.out.println("Set Top to Selected: " + selectedEntryIndex);
 					selectedEntryIndex = findEntryIndex(selectedEntry);
+					if(selectedEntryIndex < 0) {
+						ModLog.logger.error("NO SELECTED FOUND: " + selectedEntry.name + " Exists in list: " + list.containsKey(selectedEntry.name));
+						ModLog.logger.error("Top: " + topEntry.name + " Index: " + topEntryIndex);
+					}
 					setTopEntry(selectedEntry, selectedEntryIndex);
 				}
 			}
 			return;
 		}
 		
-		searchList.clear();
 		TreeMap<String, GuiListEntry> currentList = list;
 		
+		boolean containsSelected = entryFitsSearch(selectedEntry, search, filterTags, ignoreCase);
+		
+		if(selectedEntry != null && !containsSelected) {
+			setSelectedEntry(null, 0);
+		}
+		
+		if(selectedEntry != null && search.length() == 0 && containsSelected) //Count at Tags
+		{
+			searchList.put(selectedEntry.name, selectedEntry);
+			selectedEntryIndex = 0;
+		}
+		
 		//Filter tags first
-		if(filterTags != null && filterTags.length > 0) {
+		if(filterTags != null && filterTags.size() > 0) {
 			currentList = new TreeMap<String, GuiListEntry>();
+			
 			for(String tag : filterTags) {
 				tag = tag.trim();
 				SortedMap<String, HashSet<GuiListEntry>> subMap = tagList.subMap(tag, tag + "\uFFFF");
 				for(Entry<String, HashSet<GuiListEntry>> entry : subMap.entrySet()) {
 					for(GuiListEntry listEntry : entry.getValue())
-						currentList.put(listEntry.name, listEntry);
+					{
+						if(!list.containsKey(listEntry.name))
+							System.out.println("Found tagged which doesn't exist in list. Entry: " + listEntry.name + " Tag: " + entry.getKey() + " Size: " + entry.getValue().size());
+
+						if(currentList.put(listEntry.name, listEntry) == null) {
+							if(selectedEntry != null && listEntry.name.compareToIgnoreCase(selectedEntry.name) < 0)
+								selectedEntryIndex++;
+						}
+					}
 				}
 			}
 		}
@@ -220,28 +269,13 @@ public class GuiList extends Gui {
 			//currentList = searchList; //Continue search on current filtered list
 		//else
 			//searchList.clear(); //Restart search on full list
-		
-		//First see if current selection is in search results
-		if(selectedEntry != null)
-		{
-			boolean contains;
-			if(ignoreCase)
-				contains = containsIgnoreCase(selectedEntry.name, search);
-			else
-				contains = selectedEntry.name.contains(search);
-			
-			if(contains)
-			{
-				searchList.put(selectedEntry.name, selectedEntry);
-				selectedEntryIndex = 0;
-			}
-			else if(selectedEntry != null)
-			{
-				selectedEntry.onUnselect();
-				selectedEntry = null;
-			}
-		}
 
+		if(search.length() > 0 && containsSelected)
+		{
+			searchList.put(selectedEntry.name, selectedEntry);
+			selectedEntryIndex = 0;
+		}
+		
 		if(search.length() > 0)
 		{
 			Set<Entry<String, GuiListEntry>> entrySet = currentList.entrySet();
@@ -276,9 +310,53 @@ public class GuiList extends Gui {
 			setTopEntry(searchList.firstEntry().getValue(), 0);
 		else
 			setTopEntry(null, 0);
-		System.out.println("List: " + getCurrentList() + " SearchList: " + searchList);
+		
 		prevSearch = search;
 		prevIgnoreCase = ignoreCase;
+		prevFilterTags = filterTags;
+		
+		//System.out.println("List: " + getCurrentList() + " SearchList: " + searchList);
+	}
+	
+	//Returns true if the given search includes the currently selected entry
+	private boolean entryFitsSearch(GuiListEntry entry, String search, List<String> tags, boolean ignoreCase) {
+		//First see if current selection is in search results
+		if(entry != null)
+		{
+			boolean contains;
+			if(ignoreCase)
+				contains = containsIgnoreCase(entry.name, search);
+			else
+				contains = entry.name.contains(search);
+
+			//Check if selected matches Tags
+			if(contains && tags != null && tags.size() > 0) {
+				boolean hasTags = true;
+				for(String tag : tags) {
+					tag = tag.trim();
+					boolean found = false;
+					for(String entryTag : entry.tags) {
+						if(entryTag.equals(tag))
+						{
+							found = true;
+							break;
+						}
+					}
+					if(!found)
+					{
+						hasTags = false;
+						break;
+					}
+				}
+
+				if(!hasTags)
+					contains = false;
+			}
+			
+			return contains;
+		}
+		
+		return false;
 	}
 	
 	public void update() {
@@ -312,6 +390,7 @@ public class GuiList extends Gui {
 		String name = entry.name;
 		
 		TreeMap<String, GuiListEntry> currentList = getCurrentList();
+		System.out.println("Add: " + name);
 		
 		if(list.containsKey(name))
 			return false;
@@ -319,8 +398,11 @@ public class GuiList extends Gui {
 		list.put(name, entry);
 		entry.list = this;
 		
-		if(currentList == searchList && !entry.name.contains(prevSearch))
-			return true;
+		if(currentList == searchList) {
+			if(!entryFitsSearch(entry, prevSearch, prevFilterTags, prevIgnoreCase))
+				return true;
+			searchList.put(entry.name, entry);
+		}
 		
 		//Check if before current top entry(Keep track of top entry index)
 		if(topEntry != null)
@@ -347,6 +429,7 @@ public class GuiList extends Gui {
 	public boolean removeEntry(GuiListEntry entry) {
 		String name = entry.name;
 		
+		System.out.println("Remove: " + name);
 		TreeMap<String, GuiListEntry> currentList = getCurrentList();
 		
 		if(currentList != list)
@@ -354,6 +437,10 @@ public class GuiList extends Gui {
 		entry = currentList.remove(name);
 		if(entry == null)
 			return false;
+		
+		//Remove all entries in tags list
+		for(String tag : entry.tags)
+			removeTag(entry, tag);
 		
 		if(entry == selectedEntry)
 		{
@@ -444,6 +531,12 @@ public class GuiList extends Gui {
 		topEntry = entry;
 		topEntryIndex = index;
 		scrollToIndex(topEntryIndex);
+		
+		if(index < 0)
+		{
+			ModLog.logger.error("SetTop negative Index: " + (entry != null ? entry.name : "NULL") + " Index: " + index);
+			Thread.currentThread().dumpStack();
+		}
 		
 		update();
 		
@@ -704,6 +797,8 @@ public class GuiList extends Gui {
 	public void clear() {
 		list.clear();
 		searchList.clear();
+		tagList.clear();
+		
 		prevSearch = "";
 		selectedEntry = null;
 		topEntry = null;
