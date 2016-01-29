@@ -403,8 +403,12 @@ public class WorldSchematicVisualizer {
 						SchematicBlock block = schematic.getBlock(x, y, z);
 						if(block == null)
 							continue;
+						
+						ResourceItem resource = ResourceManager.getResource(vTile.resources, block.getSchematicBlockId(), block.getSchematicMeta());
+						if(resource == null)
+							continue;
 
-						Block realBlock = block.getServerBlock(schematic);
+						Block realBlock = resource.getBlock();
 						if(realBlock == null || realBlock.getMaterial() == Material.air)
 							continue;
 

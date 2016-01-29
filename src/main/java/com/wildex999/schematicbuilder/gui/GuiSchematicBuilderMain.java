@@ -33,6 +33,8 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.ChunkCache;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
+import com.wildex999.schematicbuilder.ResourceItem;
+import com.wildex999.schematicbuilder.ResourceManager;
 import com.wildex999.schematicbuilder.SchematicWorldCache;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
@@ -518,7 +520,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		//Render in 16x16x16 chunks to cache
 		if(renderChunks.size() < chunkCountX*chunkCountY*chunkCountZ) //First time render
 		{
-			int updateChunksPerFrame = 5; //How many chunks to render into cache this frame
+			int updateChunksPerFrame = 4; //How many chunks to render into cache this frame
 			int chunksUpdated = 0; 
 			boolean stopRender = false;
 			
@@ -676,7 +678,12 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 					SchematicBlock block = schematic.getBlock(x, y, z);
 					if(block == null)
 						continue;
-					Block realBlock = block.getServerBlock(cachedRenderSchematic);
+			
+					ResourceItem resource = ResourceManager.getResource(gui.tile.resources, block.getSchematicBlockId(), block.getSchematicMeta());
+					if(resource == null)
+						continue;
+					
+					Block realBlock = resource.getBlock();
 					if(realBlock == null || realBlock.getMaterial() == Material.air)
 						continue;
 					
@@ -768,7 +775,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				MessageBase msg = new MessageActionSchematicBuilder(tempTile, MessageActionSchematicBuilder.ActionType.PROGRESS);
 				msg.sendToServer();
 				visualizer.progressRender.render = false;
-				System.out.println("Stopping old Progress Render");
+				//System.out.println("Stopping old Progress Render");
 			}
 			
 			MessageBase msg = new MessageActionSchematicBuilder(gui.tile, MessageActionSchematicBuilder.ActionType.PROGRESS);
@@ -779,7 +786,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				{
 					msg.sendToServer();
 					visualizer.progressRender.render = false;
-					System.out.println("Disable Progress render");
+					//System.out.println("Disable Progress render");
 				}
 			}
 			else
@@ -789,7 +796,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				{
 					msg.sendToServer();
 					visualizer.progressRender.render = true;
-					System.out.println("Enable progress render");
+					//System.out.println("Enable progress render");
 				}
 				
 				visualizer.progressRender.tileX = gui.tile.xCoord;
