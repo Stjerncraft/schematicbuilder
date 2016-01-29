@@ -1880,6 +1880,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		newResource.blockCount = resource.blockCount;
 		newResource.placedCount = resource.placedCount;
 		ResourceManager.setResource(resources, resourcesBackMap, newResource);
+		System.out.println("Setting new resource: " + resource.getBlockId() + ":" + resource.getMeta() + " -> " + newResource.getBlockId() + ":" + newResource.getMeta());
 		resourceUpdates.add(newResource);
 		
 		markDirty();
@@ -1901,7 +1902,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	
 	//Push Stored items for Resource to the output queue
 	public void outputResourceStored(ResourceItem resource) {
-		while(resource.storedCount > 0) {
+		if(resource.getBlock() == Blocks.air)
+			return;
+		
+		while(resource.storedCount > 0 && resource.getItem() != null) {
 			ItemStack outStack = resource.getItem().copy();
 			float itemCount = resource.storedCount*resource.getItemCostPerBlock();
 			outStack.stackSize = (int) Math.min(64, Math.floor(itemCount));

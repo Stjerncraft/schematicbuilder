@@ -429,7 +429,6 @@ public class GuiList extends Gui {
 	public boolean removeEntry(GuiListEntry entry) {
 		String name = entry.name;
 		
-		System.out.println("Remove: " + name);
 		TreeMap<String, GuiListEntry> currentList = getCurrentList();
 		
 		if(currentList != list)
@@ -498,7 +497,7 @@ public class GuiList extends Gui {
 	}
 	
 	public void setSelectedEntry(GuiListEntry entry) {
-		if(!list.containsKey(entry.name))
+		if(entry == null || !list.containsKey(entry.name))
 			return;
 		
 		int index = findEntryIndex(entry);

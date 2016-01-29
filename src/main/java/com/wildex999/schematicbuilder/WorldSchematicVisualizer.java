@@ -70,6 +70,7 @@ public class WorldSchematicVisualizer {
 	
 	public TileSchematicBuilder vTile;
 	public TileSchematicBuilder fTile;
+	public int resourceVersion;
 	
 	public class ProgressRender {
 		public boolean render;
@@ -208,10 +209,11 @@ public class WorldSchematicVisualizer {
 		int chunkCountY = (int) Math.ceil((double)schematic.getHeight()/chunkSize);
 		int chunkCountZ = (int) Math.ceil((double)schematic.getLength()/chunkSize);
 		
-		if(vTile.loadedSchematic != cachedSchematic)
+		if(vTile.loadedSchematic != cachedSchematic || resourceVersion != vTile.resourceVersion)
 		{
 			newRenderCache(chunkCountX*chunkCountY*chunkCountZ);
 			cachedSchematic = vTile.loadedSchematic;
+			resourceVersion = vTile.resourceVersion;
 		}
 		
 		boolean gotFloor;

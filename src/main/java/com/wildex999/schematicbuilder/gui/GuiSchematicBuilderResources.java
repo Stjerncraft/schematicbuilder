@@ -140,14 +140,17 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	}
 	
 	//Add resource to GUI List
-	public void addResource(ResourceItem resource) {
+	public GuiListEntryResource addResource(ResourceItem resource) {
 		GuiListEntryResource listEntry = new GuiListEntryResource(getEntryName(resource), findTags(resource), resource);
 		
 		//Add tags
 		for(String tag : listEntry.tags)
 			resourceList.addTag(listEntry, tag);
 		
-		resourceList.addEntry(listEntry);
+		if(resourceList.addEntry(listEntry))
+			return listEntry;
+		else
+			return null;
 	}
 	
 	//Find the tags for the given ResourceItem
@@ -206,8 +209,11 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 			if(resourceEntrySelected == resourceEntry)
 				resourceEntrySelected = null;
 			
+			boolean isSelected = false;
+			if(resourceList.selectedEntry == resourceEntry) 
+				isSelected = true;
+			
 			resourceList.removeEntry(resourceEntry);
-			System.out.println("Remove: " + resourceEntry);
 			ResourceItem newResource = ResourceManager.getResource(gui.tile.resources, resourceEntry.resource.getSchematicBlockId(), resourceEntry.resource.getSchematicMeta());
 			if(newResource == null)
 			{
@@ -216,8 +222,11 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 									+ " while updating GUI Resource list.");
 				continue;
 			}
-			System.out.println("Updating resource: " + resourceEntry.resource.getSchematicBlockId() + " -> " + newResource.getSchematicBlockId() + " NewValid: " + newResource.valid);
-			addResource(newResource);
+			
+			GuiListEntryResource newEntry = addResource(newResource);
+			
+			if(isSelected)
+				resourceList.setSelectedEntry(newEntry);
 		}
 		
 		resourceList.noUpdate = false;
@@ -290,6 +299,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		gui.container.hideInventory(true);
 		//TODO: Allow it to remain, but detect if new Schematic is loaded
 		resourceList.clear();
+		resourceVersion = -1;
 	}
 	
 	@Override
@@ -303,36 +313,35 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		{
 			//Change item locally and send the change to server
 			ItemStack newItem = GuiBlockSelector.selectedItem;
-			if(newItem == null)
-			{
-				gui.tile.config.floorBlock = new ResourceItem((short)0, (byte)0, ResourceEntry.Unknown);
-				gui.tile.sendConfigToServer();
-			}
+			ResourceEntry entry;
+			if(newItem != null)
+				entry = ModSchematicBuilder.resourceManager.getOrCreate(Block.getBlockFromItem(newItem.getItem()), (byte)newItem.getItemDamage());
 			else
+				entry = ModSchematicBuilder.resourceManager.getOrCreate(Blocks.air, (byte)0);
+			
+			if(gui.tile.config.floorBlock.getEntry() != entry)
 			{
-				ResourceEntry entry = ModSchematicBuilder.resourceManager.getOrCreate(Block.getBlockFromItem(newItem.getItem()), (byte)newItem.getItemDamage());
-				if(gui.tile.config.floorBlock.getEntry() != entry)
-				{
-					gui.tile.config.floorBlock = new ResourceItem((short)0, (byte)0, entry); //Send to server, which will calculate counts
-					if(gui.tile.loadedSchematic != null)
-						gui.tile.config.floorBlock.blockCount = gui.tile.loadedSchematic.getWidth() * gui.tile.loadedSchematic.getLength();
-					
-					gui.tile.sendConfigToServer();
-				}
+				gui.tile.config.floorBlock = new ResourceItem((short)0, (byte)0, entry); //Send to server, which will calculate counts
+				if(gui.tile.loadedSchematic != null)
+					gui.tile.config.floorBlock.blockCount = gui.tile.loadedSchematic.getWidth() * gui.tile.loadedSchematic.getLength();
+				
+				gui.tile.sendConfigToServer();
 			}
 			
 			resourceFloor.setResource(gui.tile.config.floorBlock);
 		}
 		if(resourceSelected.buttonWasPressed() && resourceList.selectedEntry != null) {
 			ItemStack newItem = GuiBlockSelector.selectedItem;
-			System.out.println("TEST1: " + newItem + " : " + resourceEntrySelected);
-			if(newItem != null && resourceEntrySelected != null && resourceEntrySelected.resource != null)
+			if(resourceEntrySelected != null && resourceEntrySelected.resource != null)
 			{
-				ResourceEntry entry = ModSchematicBuilder.resourceManager.getOrCreate(Block.getBlockFromItem(newItem.getItem()), (byte)newItem.getItemDamage());
+				ResourceEntry entry;
+				if(newItem != null)
+					entry = ModSchematicBuilder.resourceManager.getOrCreate(Block.getBlockFromItem(newItem.getItem()), (byte)newItem.getItemDamage());
+				else
+					entry = ModSchematicBuilder.resourceManager.getOrCreate(Blocks.air, (byte)0);
+				
 				ResourceItem oldResource = resourceEntrySelected.resource;
-				System.out.println("TEST2: " + entry);
 				if(entry != null) {
-					System.out.println("TEST3");
 					ResourceItem newResource = new ResourceItem(oldResource.getSchematicBlockId(), oldResource.getSchematicMeta(), entry);
 					gui.tile.sendResourceSwapToServer(newResource);
 					
@@ -362,7 +371,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		textFieldSearch.updateCursorCounter();
 		
 		//Check for new selection
-		if(resourceList.selectedEntry != resourceEntrySelected) {
+		if(resourceEntrySelected== null || resourceList.selectedEntry != resourceEntrySelected) {
 			resourceEntrySelected = (GuiListEntryResource) resourceList.selectedEntry;
 			
 			if(resourceEntrySelected != null)
@@ -477,10 +486,10 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		//Draw tooltips
 		ArrayList<String> textList = new ArrayList<String>();
 		
-		if(buttonFloorResource.isOver(mouseX, mouseY) && buttonFloorResource.getItem() != null)
-			textList.add(buttonFloorResource.getItem().getDisplayName());
-		if(buttonSelectedResource.isOver(mouseX, mouseY) && buttonSelectedResource.getItem() != null)
-			textList.add(buttonSelectedResource.getItem().getDisplayName());
+		if(buttonFloorResource.isOver(mouseX, mouseY))
+			textList.add(buttonFloorResource.getItem() != null ? buttonFloorResource.getItem().getDisplayName() : "Air");
+		if(buttonSelectedResource.isOver(mouseX, mouseY))
+			textList.add(buttonSelectedResource.getItem() != null ? buttonSelectedResource.getItem().getDisplayName() : "Air");
 		
 		this.drawHoveringText(textList, mouseX-guiLeft, mouseY-guiTop, fontRendererObj);
 	}

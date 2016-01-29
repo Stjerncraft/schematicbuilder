@@ -89,7 +89,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	public GuiBlockSelector() {
 		blockList = new GuiList(this, 0, 0, 230, 211);
 		blockList.entryHeight = 26;
-		blockList.toggleEntries = false;
+		blockList.toggleEntries = true; //Allow selecting 'none' for Air
 	}
 	
 	public void setSelected(ItemStack item) {
@@ -99,7 +99,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 			return;
 		
 		//Update List to show this as selected
-		GuiListEntry entry = blockList.getEntry(item.getDisplayName() + "(" + item.getItemDamage() + ")");
+		GuiListEntry entry = blockList.getEntry(item.getDisplayName() + "(:" + item.getItemDamage() + ")");
 		blockList.setSelectedEntry(entry);
 		blockList.scrollToSelected();
 	}
@@ -224,6 +224,9 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 				GuiListEntryBlock blockEntry = (GuiListEntryBlock)entry;
 				selectedItem = blockEntry.item;
 			}
+			else
+				selectedItem = null;
+				
 			modalHandler.closeModal();
 			return;
 		}
@@ -254,7 +257,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 				if(entry instanceof ItemStack)
 				{
 					ItemStack entryItem = (ItemStack)entry;
-					blockList.addEntry(new GuiListEntryBlock(entryItem.getDisplayName() + "(" + entryItem.getItemDamage() + ")", null, entryItem));
+					blockList.addEntry(new GuiListEntryBlock(entryItem.getDisplayName() + "(:" + entryItem.getItemDamage() + ")", null, entryItem));
 				}
 			}
 		}

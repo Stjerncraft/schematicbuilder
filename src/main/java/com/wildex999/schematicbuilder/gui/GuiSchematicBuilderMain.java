@@ -85,6 +85,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	}
 	private ArrayList<RenderCache> renderChunks;
 	private Schematic cachedRenderSchematic;
+	private int resourceVersion = -1;
 	private int chunkSize = 16;
 	float viewZ; //Camera position
 	float viewX;
@@ -476,10 +477,11 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		int chunkCountY = (int) Math.ceil((double)schematic.getHeight()/chunkSize);
 		int chunkCountZ = (int) Math.ceil((double)schematic.getLength()/chunkSize);
 		
-		if(cachedRenderSchematic != schematic)
+		if(cachedRenderSchematic != schematic || resourceVersion != gui.tile.resourceVersion)
 		{
 			newRenderCache(chunkCountX*chunkCountY*chunkCountZ);
 			cachedRenderSchematic = schematic;
+			resourceVersion = gui.tile.resourceVersion;
 		}
 		
 		int maxSize = 0;
