@@ -101,11 +101,19 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 			return;
 		
 		//Update List to show this as selected
-		GuiListEntry entry = blockList.getEntry(block.getLocalizedName() + "(:" + meta + ")");
+		GuiListEntry entry = blockList.getEntry(getBlockName(block, meta));
 		blockList.setSelectedEntry(entry);
 		blockList.scrollToSelected();
 	}
 	
+	private String getBlockName(Block block, byte meta) {
+		ItemStack entryItem = new ItemStack(block, meta);
+		if(entryItem.getItem() != null)
+			return entryItem.getDisplayName() + "(:" + meta + ")";
+		else
+			return block.getLocalizedName() + "(:" + meta + ")";
+	}
+
 	@Override
 	public void updateScreen() {
 	}
@@ -275,7 +283,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 					}
 				}
 			} else {
-				blockList.addEntry(new GuiListEntryBlock(block.getLocalizedName(), null, block, (byte)0));
+				blockList.addEntry(new GuiListEntryBlock(getBlockName(block, (byte)0), null, block, (byte)0));
 			}
 
 		}

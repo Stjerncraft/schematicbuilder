@@ -551,8 +551,16 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		if(lastEntryHover != null && entryHoverTime <= 0) {
 			GuiListEntryResource resourceEntry = (GuiListEntryResource)lastEntryHover;
 			textList.add("Name: " + resourceEntry.name);
-			textList.add("BlockID: " + resourceEntry.resource.getBlockId() + ":" + resourceEntry.resource.getMeta());
-			textList.add("Schematic BlockID: " + resourceEntry.resource.getSchematicBlockId() + ":" + resourceEntry.resource.getSchematicMeta());
+			
+			ResourceItem resource = resourceEntry.resource;
+			if(resource != null) {
+				textList.add("BlockID: " + resource.getBlockId() + ":" + resource.getMeta());
+				textList.add("Schematic BlockID: " + resource.getSchematicBlockId() + ":" + resource.getSchematicMeta());
+				textList.add("--------");
+				textList.add("Missing: " + (resource.blockCount - resource.placedCount - resource.storedCount));
+				textList.add("Stored: " + resource.storedCount);
+				textList.add("Placed: " + resource.placedCount);
+			}
 		}
 		
 		this.drawHoveringText(textList, mouseX-guiLeft, mouseY-guiTop, fontRendererObj);
