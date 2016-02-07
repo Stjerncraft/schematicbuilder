@@ -35,7 +35,7 @@ import net.minecraft.world.ChunkCache;
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.ResourceManager;
-import com.wildex999.schematicbuilder.SchematicWorldCache;
+import com.wildex999.schematicbuilder.WorldCache;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
 import com.wildex999.schematicbuilder.gui.elements.GuiButtonCustom;
@@ -377,7 +377,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 			if(schematic != null && renderSchematic && bufferSizeField != null)
 			{
 				if(gui.tile.schematicCache == null)
-					gui.tile.schematicCache = new SchematicWorldCache(schematic);
+					gui.tile.schematicCache = new WorldCache(schematic);
 				RenderBlocks renderBlocksRi = new RenderBlocks(gui.tile.schematicCache);
 				renderBlocksRi.enableAO = false;
 				renderBlocks(texMan, renderBlocksRi, schematic);

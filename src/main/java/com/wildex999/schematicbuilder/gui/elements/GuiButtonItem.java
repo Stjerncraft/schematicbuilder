@@ -37,8 +37,10 @@ public class GuiButtonItem extends GuiButtonStretched {
 		super.drawButton(mc, mouseX, mouseY);
 		
 		//Draw the icon
+		try {
 		if(item != null && item.getItem() != null)
 			RenderItem.getInstance().renderItemIntoGUI(mc.fontRenderer, mc.getTextureManager(), item, xPosition + 5, yPosition + (height/2) - 8);
+		} catch(Exception e) {} //Allow to fail without crashing
 	}
 	
 	public ItemStack getItem() {

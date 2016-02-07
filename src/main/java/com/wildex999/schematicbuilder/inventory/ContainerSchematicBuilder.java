@@ -27,6 +27,9 @@ public class ContainerSchematicBuilder extends Container {
 	private TileSchematicBuilder tile;
 	private InventoryPlayer playerInventory;
 	
+	public static SlotInfo slotInfoSelected;
+	public static SlotInfo slotInfoFloor;
+	
 	public ContainerSchematicBuilder(InventoryPlayer playerInventory, TileSchematicBuilder tile) {
 		super();
 		this.tile = tile;
@@ -70,6 +73,10 @@ public class ContainerSchematicBuilder extends Container {
 		inventoryIndex = inventorySlots.size();
 		this.addSlotToContainer(new SlotInput(inventory, tile.inventorySlotInput, 0, 0, tile)); //Input
 		this.addSlotToContainer(new SlotOutput(inventory, tile.inventorySlotOutput, 0, 0)); //Output
+		slotInfoSelected = new SlotInfo(inventory, tile.inventorySlotInfoSelected, 0, 0);
+		this.addSlotToContainer(slotInfoSelected);
+		slotInfoFloor = new SlotInfo(inventory, tile.inventorySlotInfoFloor, 0, 0);
+		this.addSlotToContainer(slotInfoFloor);
 		setInventoryPosition(invX, invY);
 	}
 	
@@ -115,6 +122,16 @@ public class ContainerSchematicBuilder extends Container {
 		slot = (Slot)inventorySlots.get(offset++);
 		slot.xDisplayPosition = x;
 		slot.yDisplayPosition = y + 18;
+		
+		//Info - Selected
+		slot = (Slot)inventorySlots.get(offset++);
+		slot.xDisplayPosition = x - 8;
+		slot.yDisplayPosition = y - 84;
+		
+		//Info - Floor
+		slot = (Slot)inventorySlots.get(offset++);
+		slot.xDisplayPosition = x - 8;
+		slot.yDisplayPosition = y - 34;
 	}
 	
 	public void hidePlayerInventory(boolean hide) {

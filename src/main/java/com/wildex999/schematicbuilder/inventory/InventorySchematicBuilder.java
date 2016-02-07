@@ -50,6 +50,9 @@ public class InventorySchematicBuilder implements ISidedInventory {
 
 	@Override
 	public ItemStack decrStackSize(int slotIndex, int count) {
+		if(slotIndex < 0 || slotIndex >= inventoryContents.length)
+			return null;
+		
         if (inventoryContents[slotIndex] != null)
         {
             ItemStack itemstack;
@@ -78,6 +81,9 @@ public class InventorySchematicBuilder implements ISidedInventory {
 
 	@Override
 	public ItemStack getStackInSlotOnClosing(int slotIndex) {
+		if(slotIndex < 0 || slotIndex >= inventoryContents.length)
+			return null;
+		
         if (inventoryContents[slotIndex] != null)
         {
             ItemStack itemstack = this.inventoryContents[slotIndex];
@@ -90,6 +96,9 @@ public class InventorySchematicBuilder implements ISidedInventory {
 
 	@Override
 	public void setInventorySlotContents(int slotIndex, ItemStack item) {
+		if(slotIndex < 0 || slotIndex >= inventoryContents.length)
+			return;
+		
         inventoryContents[slotIndex] = item;
 
         if (item != null && item.stackSize > this.getInventoryStackLimit())

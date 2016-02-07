@@ -41,7 +41,7 @@ import net.minecraft.world.ChunkCache;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.ResourceItem;
-import com.wildex999.schematicbuilder.SchematicWorldCache;
+import com.wildex999.schematicbuilder.WorldCache;
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
 import com.wildex999.schematicbuilder.gui.elements.GuiButtonCustom;
@@ -76,7 +76,8 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	
 	private IGuiModalHandler modalHandler;
 	
-	public static ItemStack selectedItem;
+	public static Block selectedBlock;
+	public static byte selectedMeta;
 	private GuiList blockList;
 	private GuiButtonStretched buttonScrollbar;
 	
@@ -92,14 +93,15 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 		blockList.toggleEntries = true; //Allow selecting 'none' for Air
 	}
 	
-	public void setSelected(ItemStack item) {
-		selectedItem = item;
+	public void setSelected(Block block, byte meta) {
+		selectedBlock = block;
+		selectedMeta = meta;
 		
-		if(item == null)
+		if(block == null)
 			return;
 		
 		//Update List to show this as selected
-		GuiListEntry entry = blockList.getEntry(item.getDisplayName() + "(:" + item.getItemDamage() + ")");
+		GuiListEntry entry = blockList.getEntry(block.getLocalizedName() + "(:" + meta + ")");
 		blockList.setSelectedEntry(entry);
 		blockList.scrollToSelected();
 	}
@@ -119,8 +121,8 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 		
 		buttonList.clear();
 		
-		guiLeft = (width-backgroundWidth)/2;
-		guiTop = (height-backgroundHeight)/2;
+		this.guiLeft = (width-backgroundWidth)/2;
+		this.guiTop = (height-backgroundHeight)/2;
 		
 		blockList.posX = guiLeft + 6;
 		blockList.posY = guiTop + 15;
@@ -143,9 +145,9 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 		this.mc.getTextureManager().bindTexture(backgroundImage);	
 		this.drawTexturedModalRect(this.guiLeft, this.guiTop, 0, 0, backgroundWidth, backgroundHeight);
 		
-		blockList.draw(mc);
 		textFieldSearch.drawTextBox();
 		labelFilter.draw(fontRendererObj);
+		blockList.draw(mc);
 		
 		//Draw Labels and Buttons
 		super.drawScreen(mouseX, mouseY, par1);
@@ -222,10 +224,14 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 			if(entry != null)
 			{
 				GuiListEntryBlock blockEntry = (GuiListEntryBlock)entry;
-				selectedItem = blockEntry.item;
+				selectedBlock = blockEntry.block;
+				selectedMeta = blockEntry.meta;
 			}
 			else
-				selectedItem = null;
+			{
+				selectedBlock = null;
+				selectedMeta = 0;
+			}
 				
 			modalHandler.closeModal();
 			return;
@@ -244,22 +250,34 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 		
 		//Populate Blocks list
 		blockList.noUpdate = true;
+		
+		//TODO: Populate all known resources
+		
+		//Populate known server blocks
 		for(Block block : GameData.getBlockRegistry().typeSafeIterable()) {
 			ItemStack item = new ItemStack(block);
-			if(item.getItem() == null)
-				continue;
 			
-			List subList = new ArrayList();
-			block.getSubBlocks(item.getItem(), null, subList);
+			//TODO: Only list Blocks with a known Item Entry?
+			//if(item.getItem() == null)
+				//continue;
 			
-			for(Object entry : subList)
-			{
-				if(entry instanceof ItemStack)
+			if(item.getItem() != null) {
+				List subList = new ArrayList();
+				block.getSubBlocks(item.getItem(), null, subList);
+				
+				for(Object entry : subList)
 				{
-					ItemStack entryItem = (ItemStack)entry;
-					blockList.addEntry(new GuiListEntryBlock(entryItem.getDisplayName() + "(:" + entryItem.getItemDamage() + ")", null, entryItem));
+					if(entry instanceof ItemStack)
+					{
+						ItemStack entryItem = (ItemStack)entry;
+						byte meta = (byte) entryItem.getItemDamage();
+						blockList.addEntry(new GuiListEntryBlock(entryItem.getDisplayName() + "(:" + meta + ")", null, block, meta));
+					}
 				}
+			} else {
+				blockList.addEntry(new GuiListEntryBlock(block.getLocalizedName(), null, block, (byte)0));
 			}
+
 		}
 		blockList.noUpdate = false;
 		blockList.update();

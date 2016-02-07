@@ -24,7 +24,7 @@ import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.ResourceEntry;
 import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.ResourceManager;
-import com.wildex999.schematicbuilder.SchematicWorldCache;
+import com.wildex999.schematicbuilder.WorldCache;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
 import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.schematicbuilder.config.IConfigListener;
@@ -76,6 +76,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	protected InventorySchematicBuilder inventory;
 	public static int inventorySlotInput = 0; //Items Input
 	public static int inventorySlotOutput = 1; //Items Output
+	public static int inventorySlotInfoSelected = 2;
+	public static int inventorySlotInfoFloor = 3;
 	public static final int[] accessibleSlots = new int[] {0, 1};
 	
 	public BuilderState state;
@@ -175,7 +177,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	@SideOnly(Side.CLIENT)
 	public String filePath;
 	@SideOnly(Side.CLIENT)
-	public SchematicWorldCache schematicCache;
+	public WorldCache schematicCache;
 	
 	private Set<EntityPlayer> watchers;
 	private int resourceUpdateFreq = 20; //Number of ticks between resource update to client
@@ -345,10 +347,12 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		}
 		
 		//TODO: Unload check
-		/*if(canUnload() && unloadCounter++ >= unloadTimeout)
-		{
-			serverUnload();
-		}*/
+		if(canUnload()) {
+			if(unloadCounter++ >= unloadTimeout)
+				serverUnload();
+		}
+		else
+			unloadCounter = 0;
 	}
 	
 	//Take input from the Input slot and put it into Resources
@@ -443,9 +447,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	
 	//Unload the loaded Schematic and save the current state
 	private void serverUnload() {
+		if(ModSchematicBuilder.debug)
+			ModLog.logger.info("Unloading Idle Schematic from memory: " + schematicName);
 		unloadedState = state;
 		state = BuilderState.UNLOADED;
 		loadedSchematic = null;
+		
+		sendNetworkUpdateMessage(null);
 	}
 
 	//Server is loading Schematic either from Serialized upload or from file
@@ -1034,6 +1042,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 							ModLog.logger.info("Loaded Schematic: " + result.schematic.name);
 						
 						loadedSchematic = result.schematic;
+						this.resourceVersion++;
 						
 						if(uploadAfterLoad)
 						{ //Upload the loaded Schematic to the server
@@ -1213,6 +1222,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		//Send initial Update
 		sendNetworkUpdateFull((EntityPlayerMP)player);
 		sendNetworkResourcesList((EntityPlayerMP)player);
+		
+		//Reload if unloaded, as we now have activity
+		if(state == BuilderState.UNLOADED)
+			actionReload();
 	}
 
 	@Override
@@ -1520,6 +1533,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 	public boolean canUnload() {
 		//TODO: Read from Config whether to allow unload
+		if(watchers.size() > 0)
+			return false; //If we have watchers, we are not inactive
+		if(cachedSchematicFile == null || cachedSchematicFile.length() == 0)
+			return false; //Don't unload if we have no way to reload
 		return loadedSchematic != null && (state == BuilderState.READY || state == BuilderState.STOPPED || state == BuilderState.ERROR
 				|| state == BuilderState.DONE || state == BuilderState.IDLE);
 	}
@@ -1880,7 +1897,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		newResource.blockCount = resource.blockCount;
 		newResource.placedCount = resource.placedCount;
 		ResourceManager.setResource(resources, resourcesBackMap, newResource);
-		System.out.println("Setting new resource: " + resource.getBlockId() + ":" + resource.getMeta() + " -> " + newResource.getBlockId() + ":" + newResource.getMeta());
 		resourceUpdates.add(newResource);
 		
 		markDirty();
@@ -1890,8 +1906,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	public void actionReload() {
 		if(state != BuilderState.UNLOADED)
 			return;
-		//TODO: Reload the Schematic if we can
 		
+		loadSavedSchematic();
+		state = BuilderState.RELOADING;
 	}
 	
 	//Client request Schematic download

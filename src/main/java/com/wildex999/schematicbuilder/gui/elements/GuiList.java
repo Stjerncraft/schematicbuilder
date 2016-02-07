@@ -390,7 +390,6 @@ public class GuiList extends Gui {
 		String name = entry.name;
 		
 		TreeMap<String, GuiListEntry> currentList = getCurrentList();
-		System.out.println("Add: " + name);
 		
 		if(list.containsKey(name))
 			return false;
@@ -633,7 +632,7 @@ public class GuiList extends Gui {
 	}
 	
 	public GuiListEntry getEntry(int index) {
-		if(topEntry == null)
+		if(topEntry == null || index < 0)
 			return null;
 		
 		GuiListEntry current = topEntry;
@@ -809,18 +808,7 @@ public class GuiList extends Gui {
 	//Used to check which entry is currently selected
 	//Return true if an entry was clicked
 	public boolean onMouseClick(int x, int y) {
-		TreeMap<String, GuiListEntry> currentList = getCurrentList();
-		
-		//Get entry which is clicked
-		if(currentList.size() == 0)
-			return false;
-		
-		int entryIndex = ((y + yScroll) - posY) / entryHeight;
-		if(entryIndex < 0)
-			entryIndex = 0;
-		if(entryIndex >= currentList.size())
-			entryIndex = currentList.size() - 1;
-		
+		int entryIndex = getEntryIndexAtPosition(x, y);
 		GuiListEntry entry = getEntry(entryIndex);
 		
 		if(entry == null)
@@ -833,6 +821,30 @@ public class GuiList extends Gui {
 		
 		return true;
 		
+	}
+	
+	//Returns the entry index for the given position, or -1 if no entry is found
+	public int getEntryIndexAtPosition(int x, int y) {
+		TreeMap<String, GuiListEntry> currentList = getCurrentList();
+		
+		//Get entry which is clicked
+		if(currentList.size() == 0)
+			return -1;
+		
+		int entryIndex = ((y + yScroll) - posY) / entryHeight;
+		if(entryIndex < 0)
+			return -1;
+		if(entryIndex >= currentList.size())
+			return -1;
+		
+		return entryIndex;
+	}
+	
+	public GuiListEntry getEntryAtPosition(int x, int y) {
+		int index = getEntryIndexAtPosition(x,y);
+		if(index >= 0)
+			return getEntry(index);
+		return null;
 	}
 	
 	public void onButtonDragStart(GuiButton button, int x, int y) {

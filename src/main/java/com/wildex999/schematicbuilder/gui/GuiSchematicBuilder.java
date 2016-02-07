@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 import com.jcraft.jorbis.Block;
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
@@ -21,6 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
@@ -75,6 +77,8 @@ public class GuiSchematicBuilder implements IGuiHandler
 		//Tabs
 		private ArrayList<IGuiTabEntry> tabs = new ArrayList<IGuiTabEntry>();
 		private int currentTab = -1;
+
+		private boolean errorSpam = false;
 	
 		
 		/*
@@ -215,7 +219,14 @@ public class GuiSchematicBuilder implements IGuiHandler
 		
 		@Override
 		public void drawScreen(int p_73863_1_, int p_73863_2_, float p_73863_3_) {
-			super.drawScreen(p_73863_1_, p_73863_2_, p_73863_3_);
+			try {
+				super.drawScreen(p_73863_1_, p_73863_2_, p_73863_3_);
+				errorSpam  = false;
+			} catch(Exception e) {
+				if(!errorSpam)
+					System.out.println("Error while rendering screen: " + e);
+				errorSpam = true; //Stop it from spamming the same error
+			}
 		}
 		
 		@Override

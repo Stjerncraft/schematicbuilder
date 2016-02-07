@@ -2,9 +2,12 @@ package com.wildex999.schematicbuilder.gui.elements;
 
 import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.gui.GuiSchematicBuilder.GUI;
+import com.wildex999.schematicbuilder.inventory.SlotInfo;
 
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 
 /*
  * GUI Element showing a resource, with a Block and Item
@@ -14,7 +17,8 @@ import net.minecraft.client.gui.GuiScreen;
 public class GuiResourceEntry extends Gui {
 	
 	private ResourceItem resource;
-	private GuiButtonItem blockButton;
+	private GuiButtonBlock blockButton;
+	private SlotInfo slot;
 	private int x, y;
 	private GuiScreen screen;
 	
@@ -32,7 +36,7 @@ public class GuiResourceEntry extends Gui {
 	
 	private boolean buttonPressed;
 	
-	public GuiResourceEntry(GuiScreen screen, int x, int y, GuiButtonItem blockButton, ResourceItem resource) {
+	public GuiResourceEntry(GuiScreen screen, int x, int y, GuiButtonBlock blockButton, SlotInfo slot, ResourceItem resource) {
 		this.x = x;
 		this.y = y;
 		this.screen = screen;
@@ -48,6 +52,7 @@ public class GuiResourceEntry extends Gui {
 		blockButton.xPosition = x;
 		blockButton.yPosition = y + 10;
 		this.blockButton = blockButton;
+		this.slot = slot;
 		buttonPressed = false;
 		
 		setResource(resource);
@@ -57,9 +62,15 @@ public class GuiResourceEntry extends Gui {
 		this.resource = resource;
 		
 		if(resource != null)
-			blockButton.setItem(resource.getItem(), false);
+		{
+			blockButton.setBlock(resource.getBlock(), resource.getMeta(), false);
+			slot.putStack(resource.getItem());
+		}
 		else
-			blockButton.setItem(null, false);
+		{
+			blockButton.setBlock(null, (byte)0, false);
+			slot.putStack(null);
+		}
 		
 		update();
 	}

@@ -40,7 +40,7 @@ import net.minecraft.world.ChunkCache;
 import scala.actors.threadpool.Arrays;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
-import com.wildex999.schematicbuilder.SchematicWorldCache;
+import com.wildex999.schematicbuilder.WorldCache;
 import com.wildex999.schematicbuilder.blocks.BlockLibrary;
 import com.wildex999.schematicbuilder.config.StorageDirectories;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;

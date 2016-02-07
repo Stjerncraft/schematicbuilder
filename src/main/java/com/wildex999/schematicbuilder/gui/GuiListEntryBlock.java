@@ -18,6 +18,7 @@ import net.minecraft.item.ItemStack;
 import org.lwjgl.opengl.GL11;
 
 import com.wildex999.schematicbuilder.ResourceItem;
+import com.wildex999.schematicbuilder.gui.elements.GuiBlockRenderer;
 import com.wildex999.schematicbuilder.gui.elements.GuiListEntry;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
@@ -25,14 +26,18 @@ import cpw.mods.fml.common.registry.GameData;
 
 public class GuiListEntryBlock extends GuiListEntry {
 	
-	ItemStack item;
+	Block block;
+	byte meta;
+	GuiBlockRenderer blockRenderer;
 	
 	public static int colorBgNormal = 0xFF000000;
 	public static int colorBgSelected = 0xFF3DBF1D;
 	
-	public GuiListEntryBlock(String name, String[] tags, ItemStack item) {
+	public GuiListEntryBlock(String name, String[] tags, Block block, byte meta) {
 		super(name, tags);
-		this.item = item;
+		this.block = block;
+		this.meta = meta;
+		blockRenderer = new GuiBlockRenderer(Minecraft.getMinecraft(), 0, 0, 0, 0, block, meta);
 	}
 	
 	@Override
@@ -54,10 +59,11 @@ public class GuiListEntryBlock extends GuiListEntry {
 		
 		//Draw item
 		try {
-			if(item != null && item.getItem() != null)
+			if(block != null)
 			{
-				RenderItem.getInstance().renderItemIntoGUI(mc.fontRenderer, mc.getTextureManager(), item, (x+5), (y+5));
-				RenderHelper.disableStandardItemLighting();
+				blockRenderer.setPosition(x-2, y-6);
+				blockRenderer.setSize(32, 32);
+				blockRenderer.renderBlock();
 			}
 		} catch(Exception e) {
 			//Don't allow rendering to crash due to incorrect data, as that will happen often without

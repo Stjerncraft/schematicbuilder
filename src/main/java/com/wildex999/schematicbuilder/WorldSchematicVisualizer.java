@@ -239,7 +239,7 @@ public class WorldSchematicVisualizer {
 		vTile.updateDirection();
 		
 		if(vTile.schematicCache == null)
-			vTile.schematicCache = new SchematicWorldCache(schematic);
+			vTile.schematicCache = new WorldCache(schematic);
 		RenderBlocks renderBlocksRi = new RenderBlocks(vTile.schematicCache);
 		renderBlocksRi.enableAO = false;
 		

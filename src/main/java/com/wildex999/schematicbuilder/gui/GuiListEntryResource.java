@@ -18,12 +18,14 @@ import net.minecraft.item.ItemStack;
 import org.lwjgl.opengl.GL11;
 
 import com.wildex999.schematicbuilder.ResourceItem;
+import com.wildex999.schematicbuilder.gui.elements.GuiBlockRenderer;
 import com.wildex999.schematicbuilder.gui.elements.GuiListEntry;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
 public class GuiListEntryResource extends GuiListEntry {
 	
 	public ResourceItem resource;
+	private GuiBlockRenderer blockRender;
 	
 	public static int colorBgNormal = 0xFF000000;
 	public static int colorBgUnknown = 0xCBE02E00;
@@ -33,6 +35,11 @@ public class GuiListEntryResource extends GuiListEntry {
 	public GuiListEntryResource(String name, String[] tags, ResourceItem resource) {
 		super(name, tags);
 		this.resource = resource;
+		if(!resource.isUnknown())
+		{
+			blockRender = new GuiBlockRenderer(Minecraft.getMinecraft(), 0, 0, 0, 0, resource.getBlock(), resource.getMeta());
+			blockRender.rotate = false;
+		}
 	}
 	
 	@Override
@@ -56,23 +63,10 @@ public class GuiListEntryResource extends GuiListEntry {
 		this.drawRect(x, y, (x+width), (y+height - border), color);
 		this.drawRect(x, (y+height - border), (x+width), (y+height), 0xFFFFFFFF);
 		
-		//Draw item
-		ItemStack itemStack = resource.getItem();
-		//ItemStack itemStack = new ItemStack(Item.getItemFromBlock(Blocks.redstone_wire));
-		//System.out.println("Block: " + Block.getBlockFromItem(Items.redstone));
-		//ItemStack itemStack = Block.
-		
-		//RenderBlocks.getInstance().renderBlockAsItem(Blocks.redstone_wire, 0, 1.0F);
-		try {
-			if(itemStack != null && itemStack.getItem() != null)
-			{
-				//RenderHelper.enableGUIStandardItemLighting();
-				RenderItem.getInstance().renderItemIntoGUI(mc.fontRenderer, mc.getTextureManager(), itemStack, (x+5), (y+5));
-				RenderHelper.disableStandardItemLighting();
-			}
-		} catch(Exception e) {
-			//Don't allow rendering to crash due to incorrect data, as that will happen often without
-			//a way for us to stop it(Old block metadata etc.)
+		if(blockRender != null) {
+			blockRender.setPosition(x, y);
+			blockRender.setSize(24, 24);
+			blockRender.renderBlock();
 		}
 		
 		int scale = 2;
