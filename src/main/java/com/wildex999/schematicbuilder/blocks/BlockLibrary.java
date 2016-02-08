@@ -9,12 +9,14 @@ public class BlockLibrary {
 	
 	public static BlockSchematicBuilder schematicBuilder;
 	public static BlockCreativeSchematicBuilder creativeSchematicBuilder;
+	public static BlockSchematicCreator schematicCreator;
 	public static BlockUnknown unknown;
 	
 	public static void init()
 	{
 		schematicBuilder = new BlockSchematicBuilder(true);
 		creativeSchematicBuilder = new BlockCreativeSchematicBuilder();
+		schematicCreator = new BlockSchematicCreator(true);
 		unknown = new BlockUnknown();
 	}
 	

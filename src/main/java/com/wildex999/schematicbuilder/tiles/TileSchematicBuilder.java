@@ -758,7 +758,6 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			{
 				resource = config.floorBlock;
 				newBlock = config.floorBlock.getBlock();
-				System.out.println("FloorBlock: " + newBlock.getLocalizedName());
 				meta = config.floorBlock.getMeta();
 			}
 			
