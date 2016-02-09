@@ -1,5 +1,6 @@
 package com.wildex999.schematicbuilder.gui;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,7 +18,6 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.RenderList;
 import net.minecraft.client.renderer.Tessellator;
@@ -25,10 +25,10 @@ import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.settings.GameSettings;
-import net.minecraft.client.shader.TesselatorVertexState;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.ChunkCache;
 
@@ -49,11 +49,12 @@ import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder.Acti
 import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
 import com.wildex999.schematicbuilder.tiles.BuilderState;
+import com.wildex999.schematicbuilder.tiles.TileDummy;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.client.config.GuiCheckBox;
-import cpw.mods.fml.client.config.GuiSlider;
-import cpw.mods.fml.relauncher.ReflectionHelper;
+import net.minecraftforge.fml.client.config.GuiCheckBox;
+import net.minecraftforge.fml.client.config.GuiSlider;
+import net.minecraftforge.fml.relauncher.ReflectionHelper;
 
 public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntry {
 	
@@ -151,7 +152,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	
 	@Override
 	public void onTabDeactivated() {
-		clearRenderCache();
+		//clearRenderCache();
 	}
 	
 	@Override
@@ -292,7 +293,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		guiLeft = (width-backgroundWidth)/2;
 		guiTop = (height-backgroundHeight)/2;
 
-		labelContainerName = new GuiLabel(gui.tile.getInventory().getInventoryName(), this.guiLeft + 50, this.guiTop + 5, gui.colorText);
+		labelContainerName = new GuiLabel(gui.tile.getInventory().getName(), this.guiLeft + 50, this.guiTop + 5, gui.colorText);
 		labelStatus = new GuiLabel("Status:", guiLeft + 5, guiTop + 15, gui.colorText);
 		labelStatusContent = new GuiLabel("Idle", guiLeft + 43, guiTop + 15, gui.colorOk);
 		labelSchematicName = new GuiLabel("Schematic: None", guiLeft + 5, guiTop + 25, gui.colorText);
@@ -366,7 +367,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	
 	public float rot = 0.0f;
 	public float zl = -15.0f;
-	
+	/*
 	@Override
 	public void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
 		TextureManager texMan = mc.getTextureManager();
@@ -693,7 +694,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				}
 			}
 		}
-	}
+	}*/
 	
 	@Override
 	protected void mouseClickMove(int x, int y,
@@ -710,7 +711,7 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	}
 	
 	@Override
-	public void actionPerformed(GuiButton button) {
+	public void actionPerformed(GuiButton button) throws IOException {
 		super.actionPerformed(button);
 
 		if(button == buttonBuild)
@@ -770,10 +771,9 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 			//If it's not rendering progress for this tile, stop it
 			if(visualizer.progressRender.render && !visualizer.progressRender.isTile(gui.tile))
 			{
-				TileEntity tempTile = new TileEntity();
-				tempTile.xCoord = visualizer.progressRender.tileX;
-				tempTile.yCoord = visualizer.progressRender.tileY;
-				tempTile.zCoord = visualizer.progressRender.tileZ;
+				TileEntity tempTile = new TileDummy();
+				BlockPos pos = new BlockPos(visualizer.progressRender.tileX, visualizer.progressRender.tileY, visualizer.progressRender.tileZ);
+				tempTile.setPos(pos);
 				MessageBase msg = new MessageActionSchematicBuilder(tempTile, MessageActionSchematicBuilder.ActionType.PROGRESS);
 				msg.sendToServer();
 				visualizer.progressRender.render = false;
@@ -801,9 +801,10 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 					//System.out.println("Enable progress render");
 				}
 				
-				visualizer.progressRender.tileX = gui.tile.xCoord;
-				visualizer.progressRender.tileY = gui.tile.yCoord;
-				visualizer.progressRender.tileZ = gui.tile.zCoord;
+				BlockPos pos = gui.tile.getPos();
+				visualizer.progressRender.tileX = pos.getX();
+				visualizer.progressRender.tileY = pos.getY();
+				visualizer.progressRender.tileZ = pos.getZ();
 			}
 		}
 		else if(button == buttonFrame)
@@ -864,6 +865,13 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 	@Override
 	public int getTabId() {
 		return tabId;
+	}
+
+
+	@Override
+	public void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

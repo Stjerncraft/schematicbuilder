@@ -2,15 +2,17 @@ package com.wildex999.schematicbuilder;
 
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 
 import org.lwjgl.input.Keyboard;
 
 import com.wildex999.schematicbuilder.network.MessageActionSchematicBuilder;
 import com.wildex999.schematicbuilder.network.MessageBase;
+import com.wildex999.schematicbuilder.tiles.TileDummy;
 
-import cpw.mods.fml.client.registry.ClientRegistry;
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-import cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent;
+import net.minecraftforge.fml.client.registry.ClientRegistry;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.InputEvent.KeyInputEvent;
 
 public class KeyHandler {
 	public KeyHandler instance;
@@ -33,10 +35,9 @@ public class KeyHandler {
 			
 			if(visualizer.progressRender.render)
 			{
-				TileEntity tempTile = new TileEntity();
-				tempTile.xCoord = visualizer.progressRender.tileX;
-				tempTile.yCoord = visualizer.progressRender.tileY;
-				tempTile.zCoord = visualizer.progressRender.tileZ;
+				TileEntity tempTile = new TileDummy();
+				BlockPos newPos = new BlockPos(visualizer.progressRender.tileX, visualizer.progressRender.tileY, visualizer.progressRender.tileZ);
+				tempTile.setPos(newPos);
 				MessageBase msg = new MessageActionSchematicBuilder(tempTile, MessageActionSchematicBuilder.ActionType.PROGRESS);
 				msg.sendToServer();
 				visualizer.progressRender.render = false;

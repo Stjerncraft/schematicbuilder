@@ -1,23 +1,18 @@
 package com.wildex999.schematicbuilder.network;
 
-import io.netty.buffer.ByteBuf;
-
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import net.minecraft.tileentity.TileEntity;
-
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
-import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
 import com.wildex999.schematicbuilder.config.ConfigurationManager;
-import com.wildex999.schematicbuilder.network.MessageBase.TileEntityInfo;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
-import cpw.mods.fml.relauncher.Side;
+import io.netty.buffer.ByteBuf;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
+import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import net.minecraftforge.fml.relauncher.Side;
 
 /*
  * Send by server for client to update it's config to match the server.

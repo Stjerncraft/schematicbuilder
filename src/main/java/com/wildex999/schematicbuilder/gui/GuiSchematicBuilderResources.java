@@ -28,7 +28,6 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
@@ -71,7 +70,7 @@ import com.wildex999.schematicbuilder.tiles.BuilderState;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.client.config.GuiButtonExt;
+import net.minecraftforge.fml.client.config.GuiButtonExt;
 
 public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTabEntry {
 	
@@ -439,7 +438,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		resourceList.posX = guiLeft + 168;
 		resourceList.posY = guiTop + 5;
 		
-		labelContainerName = new GuiLabel(gui.tile.getInventory().getInventoryName(), guiLeft + 5, guiTop + 5, gui.colorText);
+		labelContainerName = new GuiLabel(gui.tile.getInventory().getName(), guiLeft + 5, guiTop + 5, gui.colorText);
 		labelStatus = new GuiLabel("Status:", guiLeft + 5, guiTop + 15, gui.colorText);
 		labelStatusContent = new GuiLabel("Idle", guiLeft + 43, guiTop + 15, gui.colorOk);
 		labelEnergy = new GuiLabel("", guiLeft +5, guiTop + 25, gui.colorText);
@@ -477,7 +476,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 		buttonBanned = new GuiButtonStretched(0, guiLeft + 50, guiTop + 155, 45, 12, "Banned");
 		if(currentTags == tagsBanned) buttonBanned.toggled = true;
 		labelFilter = new GuiLabel("Filter", guiLeft + 5, guiTop + 120, gui.colorText);
-		textFieldSearch = new GuiTextField(fontRendererObj, guiLeft + 5, guiTop + 130, 100, 10);
+		textFieldSearch = new GuiTextField(0, fontRendererObj, guiLeft + 5, guiTop + 130, 100, 10);
 		textFieldSearch.setText(resourceList.prevSearch);
 		
 		buttonList.add(buttonScrollbar);
@@ -567,7 +566,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	public void mouseClicked(int x, int y, int event) {
+	public void mouseClicked(int x, int y, int event) throws IOException {
 		super.mouseClicked(x, y, event);
 		
 		textFieldSearch.mouseClicked(x, y, event);
@@ -590,8 +589,8 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	protected void mouseMovedOrUp(int x, int y, int event) {
-		super.mouseMovedOrUp(x, y, event);
+	protected void mouseReleased(int x, int y, int event) {
+		super.mouseReleased(x, y, event);
 		
 		if(event == 0) //Mouse Up
 			currentButton = null;
@@ -609,7 +608,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	public void handleMouseInput() {
+	public void handleMouseInput() throws IOException {
 		super.handleMouseInput();
 		
 		//Scroll Wheel
@@ -620,7 +619,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	public void actionPerformed(GuiButton button) {
+	public void actionPerformed(GuiButton button) throws IOException {
 		super.actionPerformed(button);
 
 		currentButton = button;

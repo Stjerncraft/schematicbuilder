@@ -11,6 +11,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.IChatComponent;
 
 public class InventorySchematicBuilder implements ISidedInventory {
 
@@ -80,7 +84,7 @@ public class InventorySchematicBuilder implements ISidedInventory {
 	}
 
 	@Override
-	public ItemStack getStackInSlotOnClosing(int slotIndex) {
+	public ItemStack removeStackFromSlot(int slotIndex) {
 		if(slotIndex < 0 || slotIndex >= inventoryContents.length)
 			return null;
 		
@@ -108,12 +112,12 @@ public class InventorySchematicBuilder implements ISidedInventory {
 	}
 
 	@Override
-	public String getInventoryName() {
+	public String getName() {
 		return customName;
 	}
 
 	@Override
-	public boolean hasCustomInventoryName() {
+	public boolean hasCustomName() {
 		return !customName.isEmpty();
 	}
 
@@ -133,11 +137,11 @@ public class InventorySchematicBuilder implements ISidedInventory {
 	}
 
 	@Override
-	public void openInventory() {
+	public void openInventory(EntityPlayer player) {
 	}
 
 	@Override
-	public void closeInventory() {
+	public void closeInventory(EntityPlayer player) {
 	}
 
 	@Override
@@ -180,22 +184,45 @@ public class InventorySchematicBuilder implements ISidedInventory {
 	}
 
 	@Override
-	public int[] getAccessibleSlotsFromSide(int side) {
+	public int[] getSlotsForFace(EnumFacing side) {
 		return tile.accessibleSlots;
 	}
 
 	@Override
-	public boolean canInsertItem(int slot, ItemStack item, int side) {
+	public boolean canInsertItem(int slot, ItemStack item, EnumFacing side) {
 		if(slot == tile.inventorySlotOutput)
 			return false;
 		return this.isItemValidForSlot(slot, item);
 	}
 
 	@Override
-	public boolean canExtractItem(int slot, ItemStack item, int side) {
+	public boolean canExtractItem(int slot, ItemStack item, EnumFacing side) {
 		if(slot == tile.inventorySlotInput)
 			return false;
 		return true;
+	}
+
+	@Override
+	public int getField(int id) {
+		return 0;
+	}
+
+	@Override
+	public void setField(int id, int value) {
+	}
+
+	@Override
+	public int getFieldCount() {
+		return 0;
+	}
+
+	@Override
+	public void clear() {
+	}
+
+	@Override
+	public IChatComponent getDisplayName() {
+		return (IChatComponent)(this.hasCustomName() ? new ChatComponentText(this.getName()) : new ChatComponentTranslation(this.getName(), new Object[0]));
 	}
 
 }

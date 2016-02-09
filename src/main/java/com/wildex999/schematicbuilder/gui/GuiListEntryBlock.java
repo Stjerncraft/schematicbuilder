@@ -5,7 +5,6 @@ import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -22,7 +21,7 @@ import com.wildex999.schematicbuilder.gui.elements.GuiBlockRenderer;
 import com.wildex999.schematicbuilder.gui.elements.GuiListEntry;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
-import cpw.mods.fml.common.registry.GameData;
+import net.minecraftforge.fml.common.registry.GameData;
 
 public class GuiListEntryBlock extends GuiListEntry {
 	
@@ -73,10 +72,10 @@ public class GuiListEntryBlock extends GuiListEntry {
 		int scale = 2;
 		GL11.glScalef(1f/scale, 1f/scale, 1);
 		
-		int fontHeight = mc.fontRenderer.FONT_HEIGHT;
+		int fontHeight = mc.fontRendererObj.FONT_HEIGHT;
 		int offset = 24;
 		
-		this.drawString(mc.fontRenderer, name, scale*(x + offset), scale*(y + 2), fontColor);
+		this.drawString(mc.fontRendererObj, name, scale*(x + offset), scale*(y + 2), fontColor);
 		//this.drawString(mc.fontRenderer, "Missing: " + (resource.blockCount - resource.storedItemCount - resource.placedCount), scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
 		//this.drawString(mc.fontRenderer, "Stored: " + resource.storedItemCount, scale*(x + offset), scale*(y+2)+fontHeight*2, fontColor);
 		//this.drawString(mc.fontRenderer, "Used  : " + resource.placedCount, scale*(x + offset), scale*(y+2)+fontHeight*3, fontColor);

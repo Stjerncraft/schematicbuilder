@@ -4,27 +4,23 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
-import com.wildex999.schematicbuilder.config.ConfigurationManager;
-import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.exceptions.ExceptionInvalid;
 import com.wildex999.schematicbuilder.exceptions.ExceptionLoad;
 import com.wildex999.schematicbuilder.exceptions.ExceptionSave;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
-import cpw.mods.fml.common.registry.GameData;
 import net.minecraft.block.Block;
-import net.minecraft.init.Blocks;
 import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.fml.common.registry.FMLControlledNamespacedRegistry;
+import net.minecraftforge.fml.common.registry.GameData;
 
 //Schematic Loading/Saving heavily based on 
 //https://github.com/Lunatrius/Schematica/blob/master/src/main/java/com/github/lunatrius/schematica/world/schematic/SchematicAlpha.java
@@ -168,14 +164,14 @@ public class SchematicLoader {
         HashMap<Integer, String> nameMap = new HashMap<Integer, String>();
         if(tagCompound.hasKey(NBT_MAPPING_SCHEMATICA)) {
         	NBTTagCompound mapping = tagCompound.getCompoundTag(NBT_MAPPING_SCHEMATICA);
-        	Set<String> names = mapping.func_150296_c();
+        	Set<String> names = mapping.getKeySet();
 
         	if(ModSchematicBuilder.debug)
         		ModLog.logger.info("Loading name mapping: ");
         	
         	for(String name : names) {
         		int schematicBlockId = mapping.getInteger(name);
-        		int serverBlockId = BlockRegistry.getId(name);
+        		int serverBlockId = BlockRegistry.getId(new ResourceLocation(name));
         		
         		if(ModSchematicBuilder.debug)
         			ModLog.logger.info("Name Map(Schematic -> Server): " + name + ": " + schematicBlockId + " -> " + serverBlockId);
@@ -226,7 +222,7 @@ public class SchematicLoader {
 	        				if(block != null)
 	        				{
 	        					serverBlockId = (short)blockID;
-	        					blockName = BlockRegistry.getNameForObject(block);
+	        					blockName = block.getRegistryName();
 	        				}
 	        				else
 	        					serverBlockId = -1;

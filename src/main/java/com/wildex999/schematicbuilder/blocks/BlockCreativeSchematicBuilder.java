@@ -4,10 +4,12 @@ import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.items.ItemCreativeSchematicBuilder;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
@@ -16,24 +18,24 @@ public class BlockCreativeSchematicBuilder extends BlockSchematicBuilder {
 	
 	public BlockCreativeSchematicBuilder() {
 		super(false);
-		setBlockName(name);
-		
+		setUnlocalizedName(name);
+
 		BlockLibrary.register(this, ItemCreativeSchematicBuilder.class);
 	}
 
 	@Override
-	public void onBlockPlacedBy(World world, int x, int y, int z, EntityLivingBase placer, ItemStack item) {
-    	TileEntity te = world.getTileEntity(x, y, z);
+	public void onBlockPlacedBy(World world, BlockPos pos, IBlockState state, EntityLivingBase placer, ItemStack item) {
+    	TileEntity te = world.getTileEntity(pos);
     	if(te == null || !(te instanceof TileSchematicBuilder))
     	{
-    		System.err.println("Expected TileSchematicBuilder at(xyz) " + x + " " + y + " " + z);
+    		System.err.println("Expected TileSchematicBuilder at " + pos);
     		return;
     	}
     	TileSchematicBuilder tileBuilder = (TileSchematicBuilder) te;
     	
     	tileBuilder.isCreative = true;
 		
-		super.onBlockPlacedBy(world, x, y, z, placer, item);
+		super.onBlockPlacedBy(world, pos, state, placer, item);
 	}
 	
 }

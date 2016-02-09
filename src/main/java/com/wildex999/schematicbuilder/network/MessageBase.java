@@ -8,12 +8,13 @@ import java.util.List;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.Packet;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 import net.minecraft.world.World;
-import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
-import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.common.network.NetworkRegistry.TargetPoint;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
+import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 public abstract class MessageBase implements IMessage {
 	
@@ -53,7 +54,8 @@ public abstract class MessageBase implements IMessage {
 		public int posX, posY, posZ;
 		
 		public TileEntityInfo(TileEntity tile) {
-			posX = tile.xCoord; posY = tile.yCoord; posZ = tile.zCoord;
+			BlockPos pos = tile.getPos();
+			posX = pos.getX(); posY = pos.getY(); posZ = pos.getZ();
 		}
 		
 		public TileEntityInfo(int x, int y, int z) {
@@ -61,7 +63,7 @@ public abstract class MessageBase implements IMessage {
 		}
 		
 		public TileEntity getTileEntity(World world) {
-			return world.getTileEntity(posX, posY, posZ);
+			return world.getTileEntity(new BlockPos(posX, posY, posZ));
 		}
 	}
 	

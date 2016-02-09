@@ -123,13 +123,13 @@ public class ResourceItem {
 			entry = ResourceEntry.Banned;
 		else
 		{
-			Block block = (Block)Block.blockRegistry.getObjectById(blockId);
+			Block block = Block.getBlockById(blockId);
 			if(block == null)
 			{
 				ModLog.logger.error("Failed to get block with BlockID: " + blockId);
 				return null;
 			}
-			entry = ModSchematicBuilder.resourceManager.getOrCreate(Block.blockRegistry.getNameForObject(block), meta);
+			entry = ModSchematicBuilder.resourceManager.getOrCreate(block.getRegistryName(), meta);
 		}
 		
 		//Counting

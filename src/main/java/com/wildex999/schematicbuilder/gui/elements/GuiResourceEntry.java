@@ -98,11 +98,11 @@ public class GuiResourceEntry extends Gui {
 	}
 	
 	public void draw() {
-		labelBlock.draw(screen.mc.fontRenderer);
-		labelItem.draw(screen.mc.fontRenderer);
+		labelBlock.draw(screen.mc.fontRendererObj);
+		labelItem.draw(screen.mc.fontRendererObj);
 		
-		labelPlaced.draw(screen.mc.fontRenderer);
-		labelMissing.draw(screen.mc.fontRenderer);
-		labelStored.draw(screen.mc.fontRenderer);
+		labelPlaced.draw(screen.mc.fontRendererObj);
+		labelMissing.draw(screen.mc.fontRendererObj);
+		labelStored.draw(screen.mc.fontRendererObj);
 	}
 }

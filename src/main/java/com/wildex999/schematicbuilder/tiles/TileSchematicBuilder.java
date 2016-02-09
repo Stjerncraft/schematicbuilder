@@ -26,6 +26,7 @@ import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.ResourceManager;
 import com.wildex999.schematicbuilder.WorldCache;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
+import com.wildex999.schematicbuilder.blocks.BlockSchematicBuilder;
 import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.schematicbuilder.config.IConfigListener;
 import com.wildex999.schematicbuilder.config.StorageDirectories;
@@ -46,14 +47,11 @@ import com.wildex999.schematicbuilder.schematic.SchematicLoaderService.Result;
 import com.wildex999.schematicbuilder.schematic.SchematicMap;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.common.Optional;
-import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
-import cpw.mods.fml.common.registry.GameData;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.block.Block;
+import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.renderer.texture.ITickable;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
@@ -64,11 +62,21 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.IChatComponent;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.util.Constants;
-import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.fml.common.Optional;
+import net.minecraftforge.fml.common.registry.FMLControlledNamespacedRegistry;
+import net.minecraftforge.fml.common.registry.GameData;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 @Optional.Interface(iface = "cofh.api.energy.IEnergyHandler", modid = "CoFHAPI|energy")
-public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IConfigListener, ISidedInventory, cofh.api.energy.IEnergyHandler {
+public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiWatchers, IConfigListener, ISidedInventory, cofh.api.energy.IEnergyHandler {
 
 	protected final static String inventoryName = "Schematic Builder";
 	
@@ -114,7 +122,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			
 			nbt.setBoolean("placeFloor", placeFloor);
 			if(floorBlock != null)
-				nbt.setString("floorBlock", Block.blockRegistry.getNameForObject(Block.blockRegistry.getObjectById(floorBlock.getBlockId())));
+				nbt.setString("floorBlock", floorBlock.getBlock().getRegistryName());
 			nbt.setByte("floorBlockMeta", floorBlock.getMeta());
 			nbt.setInteger("floorBlocksCount", floorBlock.blockCount);
 			nbt.setInteger("floorBlocksPlaced", floorBlock.placedCount);
@@ -128,10 +136,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			passCount = nbt.getInteger("passCount");
 			placeFloor = nbt.getBoolean("placeFloor");
 			String floorBlockName = nbt.getString("floorBlock");
-			int floorBlockId = tile.blockRegistry.getId(floorBlockName);
+			int floorBlockId = tile.blockRegistry.getId(new ResourceLocation(floorBlockName));
 			if(floorBlockId != -1)
 			{
-				Block floorBlockTemp = tile.blockRegistry.getObjectById(floorBlockId);
+				Block floorBlockTemp = Block.getBlockById(floorBlockId);
 				byte floorBlockMeta = nbt.getByte("floorBlockMeta");
 				int blockCount = nbt.getInteger("floorBlocksCount");
 				int placedCount = nbt.getInteger("floorBlocksPlaced");
@@ -212,7 +220,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	private int chunkSize = 16;
 	
 	private SchematicBlock defaultBlock;
-	private int direction; //Direction the Builder is facing(Build direction)
+	private EnumFacing direction; //Direction the Builder is facing(Build direction)
 	private int chunkX, chunkY, chunkZ; //Cache of current chunk position
 	private int lastX, lastY, lastZ; //Current block offset in building
 	public int buildX, buildY, buildZ; //Start position for building
@@ -267,7 +275,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		uploadManager = new HashMap<EntityPlayerMP, UploadJob>();
 		progressManager = new HashSet<EntityPlayerMP>();
 		cachedSchematicFile = "";
-		direction = 0;
+		direction = EnumFacing.NORTH;
 		lastX = lastY = lastZ = 0;
 		buildX = buildY = buildZ = 0;
 		initialized = false;
@@ -297,7 +305,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 	
 	@Override
-	public void updateEntity() {	
+	public void tick() {	
 		if(!initialized) {
 			if(!worldObj.isRemote && state == BuilderState.WAITINGFORSERVER)
 				state = BuilderState.IDLE;
@@ -305,12 +313,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			ModSchematicBuilder.configGeneral.addConfigListener(this);
 			onConfigReload(ModSchematicBuilder.configGeneral);
 			
-			direction = worldObj.getBlockMetadata(xCoord, yCoord, zCoord);
-			buildX = xCoord;
-			buildY = yCoord;
+			IBlockState state = worldObj.getBlockState(getPos());
+			direction = state.getValue(BlockSchematicBuilder.FACING);
+			buildX = pos.getX();
+			buildY = pos.getY();
 			if(config.placeFloor && currentPass >= 0)
 				buildY++; //Take into account that floor has already been placed
-			buildZ = zCoord;
+			buildZ = pos.getZ();
 			if(loadedSchematic != null)
 				updateDirection();
 			initialized = true;
@@ -690,6 +699,27 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		
 	}
 	
+	//Compare two block states(Block and meta) and returns true if they are equal
+	private boolean areBlockStateEqual(IBlockState first, IBlockState second) {
+		if(first == second)
+			return true;
+		if(first == null || second == null)
+			return false;
+		
+		Block firstBlock = first.getBlock();
+		Block secondBlock = second.getBlock();
+		if(firstBlock != secondBlock)
+			return false;
+		
+		int firstMeta = firstBlock.getMetaFromState(first);
+		int secondMeta = secondBlock.getMetaFromState(second);
+		
+		if(firstMeta != secondMeta)
+			return false;
+		
+		return true;
+	}
+	
 	//Do the Building on the server
 	public void serverBuildUpdate() {
 		if(loadedSchematic == null)
@@ -705,8 +735,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		if(currentPass == 1)
 			airRepeat = ModSchematicBuilder.configGeneral.nopRepeatPassTwo;
 		SchematicBlock block = null;
-		Block newBlock = null;
-		byte meta = 0;
+		IBlockState newBlock = null;
 		
 		int prevPlacedCount = placedCount;
 		boolean needEnergy = false;
@@ -751,23 +780,22 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 					return;
 				}
 				
-				newBlock = resource.getBlock();
-				meta = resource.getMeta();
+				newBlock = resource.getBlock().getStateFromMeta(resource.getMeta());
 			}
 			else
 			{
 				resource = config.floorBlock;
-				newBlock = config.floorBlock.getBlock();
-				meta = config.floorBlock.getMeta();
+				newBlock = config.floorBlock.getBlock().getStateFromMeta(config.floorBlock.getMeta());
 			}
 			
+			BlockPos buildPos = new BlockPos(x,y,z);
 			
 			switch(currentPass) {
 			case -1: //Pass 0: Floor
 			case 0: //Pass 1: Initial placement
 				
 				//Place the block	
-				if(newBlock != Blocks.air  || config.placeAir)
+				if(newBlock.getBlock() != Blocks.air  || config.placeAir)
 				{
 					if(ModSchematicBuilder.useEnergy) { //Energy
 						if(!this.isCreative && energyStorage.getEnergyStored() < energyCostPlace)
@@ -778,19 +806,19 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 						energyStorage.modifyEnergyStored(-energyCostPlace);
 					}
 					
-					Block oldBlock = worldObj.getBlock(x, y, z);
-					if(oldBlock != newBlock || meta != worldObj.getBlockMetadata(x, y, z))
+					IBlockState oldBlock = worldObj.getBlockState(buildPos);
+					if(!areBlockStateEqual(oldBlock, newBlock))
 					{
-						if(oldBlock != Blocks.air)
+						if(oldBlock.getBlock() != Blocks.air)
 						{
 							int updateFlag = 0;
 							if(newBlock == Blocks.air)
 								updateFlag = 2; //If we are only placing air, notify that we did so 
-							worldObj.setBlock(x, y, z, Blocks.air, 0, updateFlag); //Make sure it's air before we do the "canPlace" test(Do not notify)
+							worldObj.setBlockState(buildPos, Blocks.air.getDefaultState(), updateFlag); //Make sure it's air before we do the "canPlace" test(Do not notify)
 						}
-						if(newBlock != Blocks.air) //Only place block if it isn't air(So we don't go replacing air blocks with air blocks)
+						if(newBlock.getBlock() != Blocks.air) //Only place block if it isn't air(So we don't go replacing air blocks with air blocks)
 						{
-							if(newBlock.canPlaceBlockAt(worldObj, x, y, z))
+							if(newBlock.getBlock().canPlaceBlockAt(worldObj, buildPos))
 							{
 								if(resource != null) {
 									if(!this.isCreative && resource.storedCount <= 0)
@@ -802,7 +830,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 									resource.storedCount--;
 								}
 								
-								worldObj.setBlock(x, y, z, newBlock, meta, 2);
+								worldObj.setBlockState(buildPos, newBlock, 2);
 								
 								if(resource != null) {
 									resource.placedCount++;
@@ -827,7 +855,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 				break;
 			case 1: //Pass 2: Place missing blocks, and correct metadata
 				
-				if(newBlock != Blocks.air)
+				if(newBlock.getBlock() != Blocks.air)
 				{
 					if(ModSchematicBuilder.useEnergy)
 					{
@@ -839,8 +867,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 						energyStorage.modifyEnergyStored((int)-(energyCostPlace*energyModifierPass2));
 					}
 					
-					Block placedBlock = worldObj.getBlock(x, y, z);
-					if(placedBlock != newBlock)
+					IBlockState placedBlock = worldObj.getBlockState(buildPos);
+					if(!areBlockStateEqual(placedBlock, newBlock))
 					{
 						//Check if we have the material to place the block
 						if(resource != null) {
@@ -855,17 +883,10 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 							resourceUpdates.add(resource);
 						}
 						
-						worldObj.setBlock(x, y, z, newBlock, meta, 2);
+						worldObj.setBlockState(buildPos, newBlock, 2);
 						wasAir = false;
 					}
 					
-					int placedMeta = worldObj.getBlockMetadata(x, y, z);
-					if(placedMeta != meta) //Reinforce the metadata, as some blocks change it when placed
-					{
-						worldObj.setBlockMetadataWithNotify(x, y, z, meta, 0);
-						worldObj.markBlockForUpdate(x, y, z); //Using the flags for notify will cause neighboring blocks to drop/change
-						wasAir = false;
-					}
 				}
 				else 
 				{
@@ -1797,9 +1818,9 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		chunkY = lastY/chunkSize;
 		chunkZ = lastZ/chunkSize;
 		
-		buildX = xCoord;
-		buildY = yCoord;
-		buildZ = zCoord;
+		buildX = pos.getX();
+		buildY = pos.getY();
+		buildZ = pos.getZ();
 		
 		if(config.placeFloor)
 			buildY++; //Take into account that floor has already been placed
@@ -2004,23 +2025,23 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		//1 = West (Negative X)
 		//2 = North(Negative Z)
 		//3 = East (Positive X)
-		if(direction == 0)
+		if(direction == EnumFacing.SOUTH)
 		{
-			buildX = xCoord - (loadedSchematic.getWidth()-1);
+			buildX = pos.getX() - (loadedSchematic.getWidth()-1);
 		}
-		else if(direction == 1)
+		else if(direction == EnumFacing.WEST)
 		{
-			buildX = xCoord - loadedSchematic.getWidth();
-			buildZ = zCoord - loadedSchematic.getLength();
+			buildX = pos.getX() - loadedSchematic.getWidth();
+			buildZ = pos.getZ() - loadedSchematic.getLength();
 		}
-		else if(direction == 2)
+		else if(direction == EnumFacing.NORTH)
 		{
-			buildZ = zCoord - (loadedSchematic.getLength() + 1);
+			buildZ = pos.getZ() - (loadedSchematic.getLength() + 1);
 		}
-		else if(direction == 3)
+		else if(direction == EnumFacing.EAST)
 		{
-			buildX = xCoord + 1;
-			buildZ = zCoord - 1;
+			buildX = pos.getX() + 1;
+			buildZ = pos.getZ() - 1;
 		}
 	}
 
@@ -2030,7 +2051,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 		
 		String uploadedBy = "unknown";
 		if(uploader != null)
-			uploadedBy = uploader.getDisplayName();
+			uploadedBy = uploader.getDisplayNameString();
 		
 		File saveFolder = StorageDirectories.getSaveFolderServer();
 		File schematicFile;
@@ -2385,7 +2406,7 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 			String blockName;
 			ResourceEntry entry = item.getEntry();
 			if(entry != ResourceEntry.Unknown)
-				blockName = blockRegistry.getNameForObject(entry.block);
+				blockName = entry.block.getRegistryName();
 			else
 				blockName = ""; //Unknown
 			
@@ -2413,30 +2434,30 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
     }
 
 	@Override
-	public boolean canConnectEnergy(ForgeDirection from) {
+	public boolean canConnectEnergy(EnumFacing from) {
 		//TODO: Don't connect energy in the direction we are building
 		return true;
 	}
 
 	@Override
-	public int receiveEnergy(ForgeDirection from, int maxReceive,
+	public int receiveEnergy(EnumFacing from, int maxReceive,
 			boolean simulate) {
 		return energyStorage.receiveEnergy(maxReceive, simulate);
 	}
 
 	@Override
-	public int extractEnergy(ForgeDirection from, int maxExtract,
+	public int extractEnergy(EnumFacing from, int maxExtract,
 			boolean simulate) {
 		return energyStorage.extractEnergy(maxExtract, simulate);
 	}
 
 	@Override
-	public int getEnergyStored(ForgeDirection from) {
+	public int getEnergyStored(EnumFacing from) {
 		return energyStorage.getEnergyStored();
 	}
 
 	@Override
-	public int getMaxEnergyStored(ForgeDirection from) {
+	public int getMaxEnergyStored(EnumFacing from) {
 		return energyStorage.getMaxEnergyStored();
 	}
 
@@ -2470,8 +2491,8 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 
 	@Override
-	public ItemStack getStackInSlotOnClosing(int slotIndex) {
-		return inventory.getStackInSlotOnClosing(slotIndex);
+	public ItemStack removeStackFromSlot(int slotIndex) {
+		return inventory.removeStackFromSlot(slotIndex);
 	}
 
 	@Override
@@ -2480,13 +2501,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 
 	@Override
-	public String getInventoryName() {
-		return inventory.getInventoryName();
+	public String getName() {
+		return inventory.getName();
 	}
 
 	@Override
-	public boolean hasCustomInventoryName() {
-		return inventory.hasCustomInventoryName();
+	public boolean hasCustomName() {
+		return inventory.hasCustomName();
 	}
 
 	@Override
@@ -2500,13 +2521,13 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 
 	@Override
-	public void openInventory() {
-		inventory.openInventory();
+	public void openInventory(EntityPlayer player) {
+		inventory.openInventory(player);
 	}
 
 	@Override
-	public void closeInventory() {
-		inventory.closeInventory();
+	public void closeInventory(EntityPlayer player) {
+		inventory.closeInventory(player);
 	}
 
 	@Override
@@ -2515,18 +2536,41 @@ public class TileSchematicBuilder extends TileEntity implements IGuiWatchers, IC
 	}
 
 	@Override
-	public int[] getAccessibleSlotsFromSide(int side) {
-		return inventory.getAccessibleSlotsFromSide(side);
+	public int[] getSlotsForFace(EnumFacing side) {
+		return inventory.getSlotsForFace(side);
 	}
 
 	@Override
-	public boolean canInsertItem(int slot, ItemStack item, int side) {
+	public boolean canInsertItem(int slot, ItemStack item, EnumFacing side) {
 		return inventory.canInsertItem(slot, item, side);
 	}
 
 	@Override
-	public boolean canExtractItem(int slot, ItemStack item, int side) {
+	public boolean canExtractItem(int slot, ItemStack item, EnumFacing side) {
 		return inventory.canExtractItem(slot, item, side);
+	}
+
+	@Override
+	public int getField(int id) {
+		return 0;
+	}
+
+	@Override
+	public void setField(int id, int value) {
+	}
+
+	@Override
+	public int getFieldCount() {
+		return 0;
+	}
+
+	@Override
+	public void clear() {
+	}
+
+	@Override
+	public IChatComponent getDisplayName() {
+		return (IChatComponent)(this.hasCustomName() ? new ChatComponentText(this.getName()) : new ChatComponentTranslation(this.getName(), new Object[0]));
 	}
 	
 }

@@ -7,8 +7,9 @@ import com.wildex999.utils.ModLog;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 import net.minecraft.world.World;
-import cpw.mods.fml.common.network.IGuiHandler;
+import net.minecraftforge.fml.common.network.IGuiHandler;
 
 
 public class GuiHandler implements IGuiHandler {
@@ -48,7 +49,7 @@ public class GuiHandler implements IGuiHandler {
 	public Object getClientGuiElement(int ID, EntityPlayer player, World world,
 			int x, int y, int z) {
 		IGuiHandler handler = customGuiHandlers.get(ID);
-		TileEntity tile = world.getTileEntity(x, y, z);
+		TileEntity tile = world.getTileEntity(new BlockPos(x, y, z));
 			
 		if(handler != null)
 			return handler.getClientGuiElement(ID, player, world, x, y, z);

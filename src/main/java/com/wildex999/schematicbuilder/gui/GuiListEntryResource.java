@@ -5,7 +5,6 @@ import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -72,13 +71,13 @@ public class GuiListEntryResource extends GuiListEntry {
 		int scale = 2;
 		GL11.glScalef(1f/scale, 1f/scale, 1);
 		
-		int fontHeight = mc.fontRenderer.FONT_HEIGHT;
+		int fontHeight = mc.fontRendererObj.FONT_HEIGHT;
 		int offset = 24;
 		
-		this.drawString(mc.fontRenderer, name, scale*(x + offset), scale*(y + 2), fontColor);
-		this.drawString(mc.fontRenderer, "Missing: " + (resource.blockCount - resource.storedCount - resource.placedCount) + "(" + resource.getItemCostPerBlock() + ")", scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
-		this.drawString(mc.fontRenderer, "Stored: " + resource.storedCount, scale*(x + offset), scale*(y+2)+fontHeight*2, fontColor);
-		this.drawString(mc.fontRenderer, "Used  : " + resource.placedCount, scale*(x + offset), scale*(y+2)+fontHeight*3, fontColor);
+		this.drawString(mc.fontRendererObj, name, scale*(x + offset), scale*(y + 2), fontColor);
+		this.drawString(mc.fontRendererObj, "Missing: " + (resource.blockCount - resource.storedCount - resource.placedCount) + "(" + resource.getItemCostPerBlock() + ")", scale*(x + offset), scale*(y+2)+fontHeight, fontColor);
+		this.drawString(mc.fontRendererObj, "Stored: " + resource.storedCount, scale*(x + offset), scale*(y+2)+fontHeight*2, fontColor);
+		this.drawString(mc.fontRendererObj, "Used  : " + resource.placedCount, scale*(x + offset), scale*(y+2)+fontHeight*3, fontColor);
 		
 		GL11.glScalef(scale, scale, 1);
 		

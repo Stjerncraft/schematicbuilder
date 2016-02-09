@@ -1,7 +1,5 @@
 package com.wildex999.schematicbuilder.schematic;
 
-import io.netty.buffer.ByteBuf;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,15 +7,14 @@ import java.util.List;
 import org.apache.commons.lang3.mutable.MutableInt;
 
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
-import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.common.network.ByteBufUtils;
-import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
-import cpw.mods.fml.common.registry.GameData;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraftforge.fml.common.network.ByteBufUtils;
+import net.minecraftforge.fml.common.registry.FMLControlledNamespacedRegistry;
+import net.minecraftforge.fml.common.registry.GameData;
 
 
 public class Schematic {

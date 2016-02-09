@@ -1,6 +1,6 @@
 package com.wildex999.schematicbuilder;
 
-import cpw.mods.fml.common.Optional;
+import net.minecraftforge.fml.common.Optional;
 
 public class ModCheckCoFHAPI extends ModCheck {
 

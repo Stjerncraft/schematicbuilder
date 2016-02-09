@@ -28,7 +28,7 @@ public class ResourceEntry implements IConfigListener {
 	public ResourceEntry(Block block, byte meta) {
 		//Try to find itemStack for given block
 		this.block = block;
-		this.blockId = (short) Block.blockRegistry.getIDForObject(this.block);
+		this.blockId = (short) Block.getIdFromBlock(block);
 		this.meta = meta;
 		
 		//TODO: Read config
@@ -38,7 +38,7 @@ public class ResourceEntry implements IConfigListener {
 	//Constructor when item and cost is known
 	public ResourceEntry(Block block, byte meta, ItemStack item, float costPerBlock, boolean ignoreMeta) {
 		this.block = block;
-		this.blockId = (short) Block.blockRegistry.getIDForObject(this.block);
+		this.blockId = (short) Block.getIdFromBlock(block);
 		this.meta = meta;
 		
 		setItem(item, costPerBlock, ignoreMeta);
@@ -62,7 +62,7 @@ public class ResourceEntry implements IConfigListener {
 			item = new ItemStack(block, 1, meta);
 			if(item.getItem() == null)
 			{
-				Item namedItem = (Item)Item.itemRegistry.getObject(Block.blockRegistry.getNameForObject(block));
+				Item namedItem = Item.getItemFromBlock(block);
 				if(namedItem != null)
 					item = new ItemStack(namedItem, 1, meta);
 				else

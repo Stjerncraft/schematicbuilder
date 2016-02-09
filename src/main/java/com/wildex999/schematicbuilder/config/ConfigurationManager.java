@@ -1,7 +1,5 @@
 package com.wildex999.schematicbuilder.config;
 
-import io.netty.buffer.ByteBuf;
-
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -12,9 +10,10 @@ import java.util.Map.Entry;
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.common.network.ByteBufUtils;
+import io.netty.buffer.ByteBuf;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
+import net.minecraftforge.fml.common.network.ByteBufUtils;
 
 public abstract class ConfigurationManager {
 	protected HashSet<IConfigListener> configListeners;

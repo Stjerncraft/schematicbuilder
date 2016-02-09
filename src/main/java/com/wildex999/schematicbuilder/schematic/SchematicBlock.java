@@ -1,11 +1,8 @@
 package com.wildex999.schematicbuilder.schematic;
 
-import com.wildex999.schematicbuilder.blocks.BlockLibrary;
-
-import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
-import cpw.mods.fml.common.registry.GameData;
 import net.minecraft.block.Block;
-import net.minecraft.init.Blocks;
+import net.minecraftforge.fml.common.registry.FMLControlledNamespacedRegistry;
+import net.minecraftforge.fml.common.registry.GameData;
 
 //Data for a block in a Schematic
 

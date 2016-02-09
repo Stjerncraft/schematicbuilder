@@ -1,13 +1,15 @@
 package com.wildex999.schematicbuilder;
 
-import cpw.mods.fml.common.FMLCommonHandler;
+
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.client.registry.ClientRegistry;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 
 public class ClientProxy extends CommonProxy {
 	
 	@Override
 	public void initialize() {
 		MinecraftForge.EVENT_BUS.register(new WorldSchematicVisualizer());
-		FMLCommonHandler.instance().bus().register(new KeyHandler());
+		MinecraftForge.EVENT_BUS.register(new KeyHandler());
 	}
 }

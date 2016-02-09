@@ -5,9 +5,9 @@ import java.io.File;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraftforge.common.DimensionManager;
-import cpw.mods.fml.relauncher.FMLInjectionData;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.relauncher.FMLInjectionData;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 public class StorageDirectories {
 	public static File getSaveFolderServer() {
@@ -39,7 +39,7 @@ public class StorageDirectories {
 	public static File getCacheFolderClient() {
 		File mcHome = (File)FMLInjectionData.data()[6]; //TODO: Find a cleaner way
 		
-		ServerData serverData = Minecraft.getMinecraft().func_147104_D();
+		ServerData serverData = Minecraft.getMinecraft().getCurrentServerData();
 		String server;
 		if(serverData == null)
 			server = "local";

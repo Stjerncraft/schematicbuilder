@@ -1,10 +1,9 @@
 package com.wildex999.utils;
 
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 
 import org.apache.logging.log4j.Logger;
-
-import cpw.mods.fml.common.FMLLog;
 
 public class ModLog {
 	public static Logger logger;
@@ -27,8 +26,9 @@ public class ModLog {
 		if(tile == null)
 			return "Unknown Tile(null)";
 		String worldName = "Unknown";
-		if(tile.getWorldObj() != null)
-			worldName = tile.getWorldObj().provider.getDimensionName();
-		return (messageType + " for TileEntity: " + tile + ", in World: " + worldName + "[(xyz) " + tile.xCoord + ", " + tile.yCoord + ", " + tile.zCoord + "]:");
+		if(tile.getWorld() != null)
+			worldName = tile.getWorld().provider.getDimensionName();
+		BlockPos pos = tile.getPos();
+		return (messageType + " for TileEntity: " + tile + ", in World: " + worldName + "[(xyz) " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + "]:");
 	}
 }

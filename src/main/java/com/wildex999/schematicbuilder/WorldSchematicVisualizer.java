@@ -16,23 +16,24 @@ import com.wildex999.utils.ModLog;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.EntityClientPlayerMP;
-import net.minecraft.client.renderer.RenderBlocks;
+import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.renderer.RenderList;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.texture.TextureMap;
-import net.minecraft.client.shader.TesselatorVertexState;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
 import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import cpw.mods.fml.common.eventhandler.EventPriority;
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-import cpw.mods.fml.relauncher.ReflectionHelper;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.relauncher.ReflectionHelper;
 
-@SideOnly(Side.CLIENT)
+@net.minecraftforge.fml.relauncher.SideOnly(Side.CLIENT)
 public class WorldSchematicVisualizer {
 	
 	public static WorldSchematicVisualizer instance;
@@ -78,7 +79,8 @@ public class WorldSchematicVisualizer {
 		public int targetX, targetY, targetZ;
 		
 		public boolean isTile(TileEntity tile) {
-			return tile.xCoord == tileX && tile.yCoord == tileY && tile.zCoord == tileZ;
+			BlockPos pos = tile.getPos();
+			return pos.getX() == tileX && pos.getY() == tileY && pos.getZ() == tileZ;
 		}
 	};
 	public ProgressRender progressRender = new ProgressRender();
@@ -109,7 +111,7 @@ public class WorldSchematicVisualizer {
 		}
 		
 		//Corrected player position, taking into account movement since last tick(partial ticks)
-		EntityClientPlayerMP player = Minecraft.getMinecraft().thePlayer;
+		EntityPlayerSP player = Minecraft.getMinecraft().thePlayer;
         pPosX = player.lastTickPosX + (player.posX - player.lastTickPosX) * event.partialTicks;
         pPosY = player.lastTickPosY + (player.posY - player.lastTickPosY) * event.partialTicks;
         pPosZ = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * event.partialTicks;
@@ -133,8 +135,9 @@ public class WorldSchematicVisualizer {
 		if(!progressRender.render)
 			return;
 		
-		Tessellator t = Tessellator.instance;
-		t.startDrawingQuads();
+		WorldRenderer renderer = Tessellator.getInstance().getWorldRenderer();
+		
+		/*renderer.begin(glMode, format);
 		t.setTranslation(progressRender.targetX - pPosX, progressRender.targetY - pPosY, (progressRender.targetZ+1) - pPosZ);
 		
 		//Draw Cube
@@ -193,11 +196,11 @@ public class WorldSchematicVisualizer {
 		GL11.glDepthMask(true);
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glEnable(GL11.GL_CULL_FACE);
-		//GL11.glDisable(GL11.GL_BLEND);
+		//GL11.glDisable(GL11.GL_BLEND);*/
 	}
 
 	public void renderVisualize() {
-		if(vTile == null || vTile.loadedSchematic == null || bufferSizeField == null)
+		/*if(vTile == null || vTile.loadedSchematic == null || bufferSizeField == null)
 			return;
 		
 		Schematic schematic = vTile.loadedSchematic;
@@ -220,12 +223,12 @@ public class WorldSchematicVisualizer {
 		float renderY;
 		if(vTile.config.placeFloor && vTile.config.floorBlock != null)
 		{
-			renderY = (float) ((vTile.yCoord+1) - pPosY);
+			renderY = (float) ((vTile.getPos().getY()+1) - pPosY);
 			gotFloor = true;
 		}
 		else
 		{
-			renderY = (float) (vTile.yCoord - pPosY);
+			renderY = (float) (vTile.getPos().getY() - pPosY);
 			gotFloor = false;
 		}
 		
@@ -388,9 +391,9 @@ public class WorldSchematicVisualizer {
 		mc.gameSettings.ambientOcclusion = ambientOcclusion;
 		
 		GL11.glPopMatrix();
-		GL11.glDisable(GL11.GL_BLEND);
+		GL11.glDisable(GL11.GL_BLEND);*/
 	}
-	
+	/*
 	protected void renderChunk(int chunkX, int chunkY, int chunkZ, int chunkSize, RenderBlocks renderBlocksRi, boolean gotFloor) {
 		Schematic schematic = vTile.loadedSchematic;
 		
@@ -434,7 +437,7 @@ public class WorldSchematicVisualizer {
 				}
 			}
 		}
-	}
+	}*/
 	
 	private void newRenderCache(int size) {
 		if(renderChunks.size() > 0)
@@ -466,7 +469,7 @@ public class WorldSchematicVisualizer {
 	}
 	
 	public void renderFrame() {
-		if(fTile == null || fTile.loadedSchematic == null)
+		/*if(fTile == null || fTile.loadedSchematic == null)
 			return;
 		
 		Schematic schematic = fTile.loadedSchematic;
@@ -537,6 +540,6 @@ public class WorldSchematicVisualizer {
 		
 		GL11.glDepthMask(true);
 		GL11.glDisable(GL11.GL_BLEND);
-
+*/
 	}
 }

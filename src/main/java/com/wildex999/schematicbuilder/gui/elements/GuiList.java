@@ -600,7 +600,7 @@ public class GuiList extends Gui {
 	public void draw(Minecraft mc) {
 		//Start with top entry, iterate down until outside bounds
 		
-		ScaledResolution sr = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
+		ScaledResolution sr = new ScaledResolution(mc);
 		int scale = sr.getScaleFactor();
 		
 		if(renderScrollbarBackground && scrollBar != null)

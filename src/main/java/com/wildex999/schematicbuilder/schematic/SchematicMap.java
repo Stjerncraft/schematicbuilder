@@ -1,7 +1,7 @@
 package com.wildex999.schematicbuilder.schematic;
 
-import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
+import net.minecraftforge.fml.common.network.ByteBufUtils;
 
 /*
  * Mapping from Schematic BlockId/name to Server BlockId

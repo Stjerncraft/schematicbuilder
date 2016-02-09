@@ -26,7 +26,6 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
@@ -63,8 +62,8 @@ import com.wildex999.schematicbuilder.tiles.BuilderState;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.client.config.GuiButtonExt;
-import cpw.mods.fml.common.registry.GameData;
+import net.minecraftforge.fml.client.config.GuiButtonExt;
+import net.minecraftforge.fml.common.registry.GameData;
 
 
 public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
@@ -141,7 +140,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 		blockList.setScrollbarButton(buttonScrollbar);
 		
 		labelFilter = new GuiLabel("Filter:", guiLeft + 7, guiTop + 5, GuiSchematicBuilder.GUI.colorText);
-		textFieldSearch = new GuiTextField(fontRendererObj, guiLeft + 50, guiTop + 4, 100, 10);
+		textFieldSearch = new GuiTextField(0, fontRendererObj, guiLeft + 50, guiTop + 4, 100, 10);
 		
 		buttonList.add(buttonScrollbar);
 		buttonList.add(buttonSelect);
@@ -162,7 +161,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	}
 	
 	@Override
-	public void mouseClicked(int x, int y, int event) {
+	public void mouseClicked(int x, int y, int event) throws IOException {
 		super.mouseClicked(x, y, event);
 		
 		textFieldSearch.mouseClicked(x, y, event);
@@ -186,8 +185,8 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	}
 	
 	@Override
-	protected void mouseMovedOrUp(int x, int y, int event) {
-		super.mouseMovedOrUp(x, y, event);
+	protected void mouseReleased(int x, int y, int event) {
+		super.mouseReleased(x, y, event);
 
 		if(event == 0) //Mouse Up
 			currentButton = null;
@@ -203,7 +202,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	}
 	
 	@Override
-	public void handleMouseInput() {
+	public void handleMouseInput() throws IOException {
 		super.handleMouseInput();
 		
 		//Scroll Wheel
@@ -215,7 +214,7 @@ public class GuiBlockSelector extends GuiScreenExt implements IGuiModal {
 	}
 	
 	@Override
-	public void actionPerformed(GuiButton button) {
+	public void actionPerformed(GuiButton button) throws IOException {
 		super.actionPerformed(button);
 
 		currentButton = button;

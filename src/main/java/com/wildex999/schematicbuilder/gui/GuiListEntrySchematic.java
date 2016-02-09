@@ -45,10 +45,10 @@ public class GuiListEntrySchematic extends GuiListEntry {
 		//TODO: Actually draw preview
 		this.drawRect(scale*(x+1), scale*(y+1), scale*(x+33), scale*(y+33), 0xFFDDDDDD);
 		
-		int fontHeight = mc.fontRenderer.FONT_HEIGHT;
-		this.drawString(mc.fontRenderer, name, scale*(x + 34), scale*(y + 2), fontColor);
-		this.drawString(mc.fontRenderer, "Author: " + author, scale*(x + 34), scale*(y + 2) + fontHeight, fontColor);
-		this.drawString(mc.fontRenderer, "Width: " + scWidth + ", Height: " + scHeight + ", Length: " + scLength, scale*(x + 2), scale*(y + 34), fontColor);
+		int fontHeight = mc.fontRendererObj.FONT_HEIGHT;
+		this.drawString(mc.fontRendererObj, name, scale*(x + 34), scale*(y + 2), fontColor);
+		this.drawString(mc.fontRendererObj, "Author: " + author, scale*(x + 34), scale*(y + 2) + fontHeight, fontColor);
+		this.drawString(mc.fontRendererObj, "Width: " + scWidth + ", Height: " + scHeight + ", Length: " + scLength, scale*(x + 2), scale*(y + 34), fontColor);
 		
 		StringBuilder sb = new StringBuilder();
 		if(tags != null)
@@ -57,7 +57,7 @@ public class GuiListEntrySchematic extends GuiListEntry {
 				sb.append(tag + ", ");
 		}
 		
-		this.drawString(mc.fontRenderer, "Tags: " + sb.toString(), scale*(x+2), scale*(y+34) + fontHeight, fontColor);
+		this.drawString(mc.fontRendererObj, "Tags: " + sb.toString(), scale*(x+2), scale*(y+34) + fontHeight, fontColor);
 		
 		GL11.glScalef(scale, scale, 1);
 		

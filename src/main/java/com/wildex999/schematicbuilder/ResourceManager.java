@@ -27,7 +27,7 @@ public class ResourceManager implements IConfigListener{
 	//Returns the old entry or null
 	public ResourceEntry setEntry(Block block, byte meta, ResourceEntry entry)
 	{
-		return setEntry(Block.blockRegistry.getNameForObject(block), meta, entry);
+		return setEntry(Block.blockRegistry.getNameForObject(block).toString(), meta, entry);
 	}
 	
 	//Set the new entry, and return the old entry or null
@@ -45,7 +45,7 @@ public class ResourceManager implements IConfigListener{
 		ResourceEntry entry = getEntry(blockName, meta);
 		if(entry == null)
 		{
-			Block block = (Block) Block.blockRegistry.getObject(blockName);
+			Block block = Block.getBlockFromName(blockName);
 			if(block != null)
 				entry = new ResourceEntry(block, meta);
 			else
@@ -57,7 +57,7 @@ public class ResourceManager implements IConfigListener{
 	}
 	
 	public ResourceEntry getOrCreate(Block block, byte meta) {
-		return getOrCreate(Block.blockRegistry.getNameForObject(block), meta);
+		return getOrCreate(block.getRegistryName(), meta);
 	}
 	
 	//Get the Resource Entry for the given block and metadata
@@ -70,7 +70,7 @@ public class ResourceManager implements IConfigListener{
 	//Get the Resource Entry for the given block and metadata
 	//Returns null if no entry matching entry exists
 	public ResourceEntry getEntry(Block block, byte meta) {
-		return getEntry(Block.blockRegistry.getNameForObject(block), meta);
+		return getEntry(block.getRegistryName(), meta);
 	}
 	
 	public void addItemMapping(Item item, ResourceEntry resourceEntry) {

@@ -1,13 +1,12 @@
 package com.wildex999.schematicbuilder;
 
-import net.minecraft.entity.player.EntityPlayerMP;
-
 import com.wildex999.schematicbuilder.network.MessageBase;
 import com.wildex999.schematicbuilder.network.MessageConfigUpdate;
 import com.wildex999.schematicbuilder.network.MessageConfigUpdate.ConfigType;
 
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
 
 public class PlayerManager {
 	public PlayerManager() {

@@ -7,14 +7,18 @@ import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
 import com.wildex999.utils.ModLog;
 
-import cpw.mods.fml.relauncher.ReflectionHelper;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraft.block.Block;
+import net.minecraft.block.state.BlockState;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.init.Blocks;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -24,7 +28,7 @@ import net.minecraft.world.WorldType;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.storage.ISaveHandler;
-import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraft.world.storage.WorldInfo;
 
 /*
  * Custom IBlockAccess storing a World for use when rendering preview
@@ -49,13 +53,26 @@ public class WorldCache extends World {
 	
 	static Field arrayField = null;
 	static ISaveHandler saveHandler = null;
-	static WorldProvider wProvider = null;
 	static WorldSettings wSettings = new WorldSettings(0, WorldSettings.GameType.SURVIVAL, false, false, WorldType.DEFAULT);
 	static Profiler p = null;
 	
+	static WorldProvider wProvider = new WorldProvider() {
+		
+		@Override
+		public String getInternalNameSuffix() {
+			return "SB_";
+		}
+		
+		@Override
+		public String getDimensionName() {
+			return "SchematicBuilder_DummyWorld";
+		}
+	};
+	
+	
 	@SideOnly(Side.CLIENT)
 	public WorldCache(Schematic schematic) {
-		super(saveHandler, "", wProvider, wSettings, p);
+		super(saveHandler, new WorldInfo(wSettings, "SchematicBuilder_DummyWorld"), wProvider, p, true);
 		
 		//World Constructor allocates 128kb array, we remove it.
 		//This is an ugly solution which causes a lot of gc churn.
@@ -79,7 +96,7 @@ public class WorldCache extends World {
 		
 		blocks = new ArrayList<Block>(width*height*length);
 		metadata = new ArrayList<Byte>(width*height*length);
-		
+
 		//Copy over the data
 		for(int x = 0; x < width; x++)
 		{
@@ -116,7 +133,7 @@ public class WorldCache extends World {
 	
 	@SideOnly(Side.CLIENT)
 	public WorldCache(Block block, byte meta) {
-		super(saveHandler, "", wProvider, wSettings, p);
+		super(saveHandler, new WorldInfo(wSettings, "SchematicBuilder_DummyWorld"), wProvider, p, true);
 		this.block = block;
 		this.meta = meta;
 		
@@ -144,23 +161,47 @@ public class WorldCache extends World {
 	}
 	
 	@Override
-	public Block getBlock(int x, int y, int z) {
-		if(x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= length)
-			return Blocks.air;
-		return blocks.get(getIndex(x,y,z));
+	public IBlockState getBlockState(BlockPos pos) {
+		if(pos.getX() < 0 || pos.getY() < 0 || pos.getZ() < 0 || pos.getX() >= width || pos.getY() >= height || pos.getZ() >= length)
+			return Blocks.air.getDefaultState();
+		
+		int index = getIndex(pos.getX(),pos.getY(),pos.getZ());
+		Block block = blocks.get(index);
+		byte meta = metadata.get(index);
+		if(block != null)
+			return block.getStateFromMeta(meta);
+		
+		return Blocks.air.getDefaultState();
 	}
 	
 	@Override
-	public boolean blockExists(int x, int y, int z) {
-		return blocks.get(getIndex(x,y,z)) != null;
+	public boolean setBlockState(BlockPos pos, IBlockState newState, int flags) {
+		Block block = newState.getBlock();
+		byte meta = (byte) block.getMetaFromState(newState);
+		int index = getIndex(pos.getX(), pos.getY(), pos.getZ());
+		
+		blocks.set(index, block);
+		metadata.set(index, meta);
+		
+		return true;
+	}
+	
+	@Override
+	public boolean isAirBlock(BlockPos pos) {
+		return blocks.get(getIndex(pos.getX(), pos.getY(), pos.getZ())) != null;
 	}
 
 	@Override
-	public TileEntity getTileEntity(int x, int y,int z) {
+    public boolean isBlockLoaded(BlockPos pos, boolean allowEmpty)
+    {
+		return true;
+    }
+	
+	@Override
+	public TileEntity getTileEntity(BlockPos pos) {
 		try {
-			Block block = getBlock(x, y, z);
-			int meta = getBlockMetadata(x, y, z);
-			TileEntity tile = block.createTileEntity(this, meta);
+			IBlockState blockState = getBlockState(pos);
+			TileEntity tile = block.createTileEntity(this, blockState);
 			if(tile != null)
 				tile.setWorldObj(this);
 			return tile;
@@ -168,43 +209,6 @@ public class WorldCache extends World {
 			//Simply ignore errors, as they will happen if TileEntity requires a valid world
 		}
 		return null;
-	}
-
-	@Override
-	public int getLightBrightnessForSkyBlocks(int x, int y,int z, int p_72802_4_) {
-        return EnumSkyBlock.Block.defaultLightValue;
-	}
-
-	@Override
-	public int getBlockMetadata(int x, int y, int z) {
-		if(x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= length)
-			return 0;
-		return metadata.get(getIndex(x,y,z));
-	}
-	
-	@Override
-	public boolean setBlockMetadataWithNotify(int x, int y, int z, int meta, int flag) {
-		if(x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= length)
-			return false;
-		
-		metadata.set(getIndex(x,y,z), (byte)meta);
-		return true;
-	}
-
-	@Override
-	public int isBlockProvidingPowerTo(int x, int y,int z, int p_72879_4_) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public boolean isAirBlock(int x, int y, int z) {
-		return getBlock(x, y, z).isAir(this, x, y, z);
-	}
-
-	@Override
-	public BiomeGenBase getBiomeGenForCoords(int x, int z) {
-		return BiomeGenBase.sky;
 	}
 
 	@Override
@@ -216,33 +220,36 @@ public class WorldCache extends World {
 	public boolean extendedLevelsInChunkCache() {
 		return true;
 	}
+	
+	@Override
+    @SideOnly(Side.CLIENT)
+    public int getCombinedLight(BlockPos pos, int lightValue)
+    {
+        return EnumSkyBlock.SKY.defaultLightValue;
+    }
+	
+	@Override
+    @SideOnly(Side.CLIENT)
+    public BiomeGenBase getBiomeGenForCoords(BlockPos pos) {
+		return BiomeGenBase.plains;
+	}
 
 	@Override
-	public boolean isSideSolid(int x, int y, int z, ForgeDirection side, boolean _default) {
-        if (x < -30000000 || z < -30000000 || x >= 30000000 || z >= 30000000)
-        {
+	public boolean isSideSolid(BlockPos pos, EnumFacing side, boolean _default) {
+        if (pos.getX() < -30000000 || pos.getZ() < -30000000 || pos.getX() >= 30000000 || pos.getZ() >= 30000000)
             return _default;
-        }
 
-        return getBlock(x, y, z).isSideSolid(this, x, y, z, side);
+        return getBlockState(pos).getBlock().isSideSolid(this, pos, side);
 	}
 
 	@Override
 	protected IChunkProvider createChunkProvider() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	protected int func_152379_p() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public Entity getEntityByID(int p_73045_1_) {
-		// TODO Auto-generated method stub
-		return null;
+	protected int getRenderDistanceChunks() {
+		return 6;
 	}
 
 }

@@ -26,7 +26,6 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
@@ -60,7 +59,7 @@ import com.wildex999.schematicbuilder.schematic.SchematicLoader;
 import com.wildex999.schematicbuilder.tiles.BuilderState;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
-import cpw.mods.fml.client.config.GuiButtonExt;
+import net.minecraftforge.fml.client.config.GuiButtonExt;
 
 public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTabEntry {
 	
@@ -224,7 +223,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		schematicList.posX = guiLeft + 113;
 		schematicList.posY = guiTop + 19;
 		
-		labelContainerName = new GuiLabel(gui.tile.getInventory().getInventoryName(), this.guiLeft + 10, this.guiTop + 5, gui.colorText);
+		labelContainerName = new GuiLabel(gui.tile.getInventory().getName(), this.guiLeft + 10, this.guiTop + 5, gui.colorText);
 		labelCountFiltered = new GuiLabel(createLabelCountFiltered(), guiLeft + 125, guiTop + 5, gui.colorText);
 		labelSearch = new GuiLabel("Search", guiLeft + 5, guiTop + 20, gui.colorText);
 		labelFilterTags = new GuiLabel("Filter Tags(t1,t2,...)", guiLeft + 5, guiTop + 45, gui.colorText);
@@ -233,8 +232,8 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 		labelSizeMin = new GuiLabel("Min(Width,Height,Len.)", guiLeft + 5, guiTop + 120, gui.colorText);
 		labelSizeMax = new GuiLabel("Max(Width,Height,Len.)", guiLeft + 5, guiTop + 145, gui.colorText);
 		
-		textFieldSearch = new GuiTextField(fontRendererObj, guiLeft + 5, guiTop + 30, 100, 10);
-		textFieldFilterTags = new GuiTextField(fontRendererObj, guiLeft + 5, guiTop + 55, 100, 10);
+		textFieldSearch = new GuiTextField(0, fontRendererObj, guiLeft + 5, guiTop + 30, 100, 10);
+		textFieldFilterTags = new GuiTextField(0, fontRendererObj, guiLeft + 5, guiTop + 55, 100, 10);
 		
 		buttonScrollbar = new GuiButtonStretched(0, schematicList.posX + schematicList.width, schematicList.posY + schematicList.height, "");
 		schematicList.setScrollbarButton(buttonScrollbar);
@@ -311,7 +310,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	public void mouseClicked(int x, int y, int event) {
+	public void mouseClicked(int x, int y, int event) throws IOException {
 		super.mouseClicked(x, y, event);
 		
 		textFieldSearch.mouseClicked(x, y, event);
@@ -343,8 +342,8 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	protected void mouseMovedOrUp(int x, int y, int event) {
-		super.mouseMovedOrUp(x, y, event);
+	protected void mouseReleased(int x, int y, int event) {
+		super.mouseReleased(x, y, event);
 		
 		if(event == 0) //Mouse Up
 			currentButton = null;
@@ -360,7 +359,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	public void handleMouseInput() {
+	public void handleMouseInput() throws IOException {
 		super.handleMouseInput();
 		
 		//Scroll Wheel
@@ -371,7 +370,7 @@ public class GuiSchematicBuilderLoadLocal extends GuiScreenExt implements IGuiTa
 	}
 	
 	@Override
-	public void actionPerformed(GuiButton button) {
+	public void actionPerformed(GuiButton button) throws IOException {
 		super.actionPerformed(button);
 
 		currentButton = button;

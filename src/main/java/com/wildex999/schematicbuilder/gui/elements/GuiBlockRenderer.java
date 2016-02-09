@@ -11,15 +11,22 @@ import com.wildex999.schematicbuilder.WorldCache;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.state.BlockState;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.RenderBlocks;
+import net.minecraft.client.renderer.BlockRendererDispatcher;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.renderer.tileentity.TileEntityRendererDispatcher;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockPos;
+import net.minecraft.util.EnumWorldBlockLayer;
 
 //Element for rendering a single block in the GUI
 
@@ -30,14 +37,13 @@ public class GuiBlockRenderer extends Gui {
 	private int renderPosX, renderPosY;
 	private int renderWidth, renderHeight;
 	
-	private WorldCache worldCache;
-	private Block block;
-	private byte meta;
+	private static WorldCache worldCache;
+	private static Tessellator tessellator;
+	private IBlockState block;
 	
 	public boolean rotate = true;
 	
 	private TextureManager texMan;
-	private RenderBlocks renderBlocksRi;
 	
 	private float rot;
 	
@@ -48,13 +54,14 @@ public class GuiBlockRenderer extends Gui {
 		renderWidth = width;
 		renderHeight = height;
 		
-		this.block = block;
-		this.meta = meta;
+		this.block = block.getStateFromMeta(meta);
 		
 		//Set up rendering
 		worldCache = new WorldCache(block, meta);
 		texMan = mc.getTextureManager();
-		renderBlocksRi = new RenderBlocks(worldCache);
+		
+		if(tessellator == null)
+			tessellator = new Tessellator(2097152);
 	}
 	
 	public void setPosition(int x, int y) {
@@ -68,7 +75,11 @@ public class GuiBlockRenderer extends Gui {
 	}
 	
 	public void renderBlock() {
-        ScaledResolution sr = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
+		if(worldCache == null || block == null)
+			return;
+		
+        ScaledResolution sr = new ScaledResolution(mc);
+        worldCache.setBlockState(new BlockPos(0,0,0), block);
         
 		//Camera(Project)
         float farPlaneDistance = (float)((this.mc.gameSettings.renderDistanceChunks + 10) * 16 );
@@ -82,7 +93,6 @@ public class GuiBlockRenderer extends Gui {
         GL11.glMatrixMode(GL11.GL_MODELVIEW);
         GL11.glPushMatrix();
         GL11.glLoadIdentity();
-        //GL11.glRotatef(0f, 0.0F, 0.0F, 1.0F); //Correct z direction so we don't see inside the blocks
 		
 		texMan.bindTexture(TextureMap.locationBlocksTexture);
 
@@ -90,15 +100,13 @@ public class GuiBlockRenderer extends Gui {
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearDepth(1.0f);
         GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
-
-        renderBlocksRi.useInventoryTint = true; //renderWithColor
         
 		int ambientOcclusion = Minecraft.getMinecraft().gameSettings.ambientOcclusion;
 		Minecraft.getMinecraft().gameSettings.ambientOcclusion = 0; //Don't do light level checks
 		
 		//Prepare render
 		GL11.glViewport(renderPosX*sr.getScaleFactor(), mc.displayHeight-((renderPosY*sr.getScaleFactor()) + renderHeight*sr.getScaleFactor()), renderWidth*sr.getScaleFactor(), renderHeight*sr.getScaleFactor());
-		Tessellator.instance.setTranslation(-0.5f, -0.5f, -0.5f);
+		//Tessellator.instance.setTranslation(-0.5f, -0.5f, -0.5f);
         
         GL11.glTranslatef(0, 0, -1.5f);
         
@@ -113,7 +121,7 @@ public class GuiBlockRenderer extends Gui {
         GL11.glScalef(scale, scale, scale);
         
 		//Render TileEntity if available
-		try {
+		/*try {
 			if(block.hasTileEntity(meta)) {
 				TileEntity tile = worldCache.getTileEntity(0, 0, 0);
 				if(tile != null) {
@@ -125,17 +133,37 @@ public class GuiBlockRenderer extends Gui {
 				System.out.println("Failed to render: ");
 				e.printStackTrace();
 			}
-		}
-
+		}*/
+        
+        WorldRenderer worldRendererIn = null; //TODO: Create own WorldRenderer, not used by the rest of the game
+        try {
+        
+        BlockRendererDispatcher render = mc.getBlockRendererDispatcher();
+        worldRendererIn = tessellator.getWorldRenderer();
+        
+        //Pre render
+        worldRendererIn.begin(7, DefaultVertexFormats.BLOCK);
+        worldRendererIn.setTranslation(-0.5,-0.5,-0.5);
+        
+        //Render
+        render.renderBlock(block, new BlockPos(0,0,0), worldCache, worldRendererIn);
+        tessellator.draw();
+        
+        //Post render
+        worldRendererIn.setTranslation(0, 0, 0);
 		
-		//Render
-		Tessellator.instance.startDrawingQuads();	
-		renderBlocksRi.renderBlockByRenderType(block, 0, 0, 0);	
-		Tessellator.instance.draw(); //Render and reset state
+        } catch(Exception e) {
+        	worldCache = null; //Stop rendering
+        	try {
+        		worldRendererIn.finishDrawing();
+        	} catch(Exception ee) {} //A failed render can leave the renderer in a state to crash the game
+        	
+        	System.out.println("GUI Block rendering failed!");
+        	e.printStackTrace();
+        }
 
 		//Cleanup state
-		Minecraft.getMinecraft().gameSettings.ambientOcclusion = ambientOcclusion;
-        Tessellator.instance.setTranslation(0, 0, 0);
+        Minecraft.getMinecraft().gameSettings.ambientOcclusion = ambientOcclusion;
         GL11.glViewport(0,  0, mc.displayWidth, mc.displayHeight);
         
         GL11.glScalef(1f/scale, 1f/scale, 1f/scale);
