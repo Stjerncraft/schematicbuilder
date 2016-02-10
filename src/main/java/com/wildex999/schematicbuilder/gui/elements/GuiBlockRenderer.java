@@ -54,10 +54,14 @@ public class GuiBlockRenderer extends Gui {
 		renderWidth = width;
 		renderHeight = height;
 		
-		this.block = block.getStateFromMeta(meta);
+		try {
+			this.block = block.getStateFromMeta(meta);
+		} catch(Exception e) {
+			this.block = block.getDefaultState();
+		}
 		
 		//Set up rendering
-		worldCache = new WorldCache(block, meta);
+		worldCache = new WorldCache(this.block);
 		texMan = mc.getTextureManager();
 		
 		if(tessellator == null)
@@ -157,9 +161,10 @@ public class GuiBlockRenderer extends Gui {
         	try {
         		worldRendererIn.finishDrawing();
         	} catch(Exception ee) {} //A failed render can leave the renderer in a state to crash the game
-        	
-        	System.out.println("GUI Block rendering failed!");
-        	e.printStackTrace();
+        	if(ModSchematicBuilder.debug) {
+	        	System.out.println("GUI Block rendering failed: " + block);
+	        	e.printStackTrace();
+        	}
         }
 
 		//Cleanup state

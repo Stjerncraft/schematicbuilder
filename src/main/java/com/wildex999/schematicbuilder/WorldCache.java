@@ -2,6 +2,7 @@ package com.wildex999.schematicbuilder;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.schematic.SchematicBlock;
@@ -38,17 +39,14 @@ import net.minecraft.world.storage.WorldInfo;
 public class WorldCache extends World {
 
 	private Schematic schematic;
-	
-	private Block block;
-	private byte meta;
+	private IBlockState block;
 	
 	private int width;
 	private int height;
 	private int length;
 	
 	//TODO: Allow for 'loading' into cache gradually(One chunk at a time etc.)
-	ArrayList<Block> blocks;
-	ArrayList<Byte> metadata;
+	ArrayList<IBlockState> blocks;
 	
 	
 	static Field arrayField = null;
@@ -71,7 +69,7 @@ public class WorldCache extends World {
 	
 	
 	@SideOnly(Side.CLIENT)
-	public WorldCache(Schematic schematic) {
+	public WorldCache(Schematic schematic, HashMap<Short, ResourceItem> resourceMap) {
 		super(saveHandler, new WorldInfo(wSettings, "SchematicBuilder_DummyWorld"), wProvider, p, true);
 		
 		//World Constructor allocates 128kb array, we remove it.
@@ -94,8 +92,7 @@ public class WorldCache extends World {
 		this.height = schematic.getHeight();
 		this.length = schematic.getLength();
 		
-		blocks = new ArrayList<Block>(width*height*length);
-		metadata = new ArrayList<Byte>(width*height*length);
+		blocks = new ArrayList<IBlockState>(width*height*length);
 
 		//Copy over the data
 		for(int x = 0; x < width; x++)
@@ -105,54 +102,48 @@ public class WorldCache extends World {
 				for(int z = 0; z < length; z++)
 				{
 					SchematicBlock schematicBlock = schematic.getBlock(x, y, z);
-					Block block;
-					byte meta = 0;
+					IBlockState blockState = null;
 					if(schematicBlock != null)
 					{
-						block = schematicBlock.getServerBlock(schematic);
-						meta = schematicBlock.getMeta(schematic);
+						short blockId = schematicBlock.getSchematicBlockId();
+						byte meta = schematicBlock.getSchematicMeta();
+						ResourceItem resource = ResourceManager.getResource(resourceMap, blockId, meta);
+						if(resource != null) {
+							try {
+								blockState = resource.getBlock().getStateFromMeta(resource.getMeta());
+							} catch(Exception e) {
+								blockState = resource.getBlock().getDefaultState();
+							}
+						}
 					}
-					else
-						block = null;
-
 					
-					if(block != null)
-					{
-						blocks.add(block);
-						metadata.add(meta);
-					}
+					if(blockState != null)
+						blocks.add(blockState);
 					else
-					{
-						blocks.add(Blocks.air);
-						metadata.add((byte) 0);
-					}
+						blocks.add(Blocks.air.getDefaultState());
 				}
 			}
 		}
 	}
 	
 	@SideOnly(Side.CLIENT)
-	public WorldCache(Block block, byte meta) {
+	public WorldCache(IBlockState blockState) {
 		super(saveHandler, new WorldInfo(wSettings, "SchematicBuilder_DummyWorld"), wProvider, p, true);
-		this.block = block;
-		this.meta = meta;
+		this.block = blockState;
 		
 		this.width = 1;
 		this.height = 1;
 		this.length = 1;
 		
-		blocks = new ArrayList<Block>(1);
-		metadata = new ArrayList<Byte>(1);
-		
+		blocks = new ArrayList<IBlockState>(1);
 		blocks.add(block);
-		metadata.add(meta);
 	}
 	
 	public Schematic getSchematic() {
 		return schematic;
 	}
 	
-	public Block getBlock() {
+	public IBlockState getBlock() {
 		return block;
 	}
 	
@@ -166,29 +157,20 @@ public class WorldCache extends World {
 			return Blocks.air.getDefaultState();
 		
 		int index = getIndex(pos.getX(),pos.getY(),pos.getZ());
-		Block block = blocks.get(index);
-		byte meta = metadata.get(index);
-		if(block != null)
-			return block.getStateFromMeta(meta);
-		
-		return Blocks.air.getDefaultState();
+		return blocks.get(index);
 	}
 	
 	@Override
 	public boolean setBlockState(BlockPos pos, IBlockState newState, int flags) {
-		Block block = newState.getBlock();
-		byte meta = (byte) block.getMetaFromState(newState);
 		int index = getIndex(pos.getX(), pos.getY(), pos.getZ());
-		
-		blocks.set(index, block);
-		metadata.set(index, meta);
+		blocks.set(index, newState);
 		
 		return true;
 	}
 	
 	@Override
 	public boolean isAirBlock(BlockPos pos) {
-		return blocks.get(getIndex(pos.getX(), pos.getY(), pos.getZ())) != null;
+		return blocks.get(getIndex(pos.getX(), pos.getY(), pos.getZ())).getBlock() == Blocks.air;
 	}
 
 	@Override
@@ -201,7 +183,7 @@ public class WorldCache extends World {
 	public TileEntity getTileEntity(BlockPos pos) {
 		try {
 			IBlockState blockState = getBlockState(pos);
-			TileEntity tile = block.createTileEntity(this, blockState);
+			TileEntity tile = blockState.getBlock().createTileEntity(this, blockState);
 			if(tile != null)
 				tile.setWorldObj(this);
 			return tile;

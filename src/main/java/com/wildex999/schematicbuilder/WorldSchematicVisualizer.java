@@ -15,12 +15,15 @@ import com.wildex999.utils.ModLog;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.renderer.BlockRendererDispatcher;
 import net.minecraft.client.renderer.RenderList;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.texture.TextureMap;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.BlockPos;
@@ -57,7 +60,7 @@ public class WorldSchematicVisualizer {
 	
 	public Schematic cachedSchematic;
 	
-	private RenderList renderList;
+	private Tessellator tessellator;
 	private int renderListStart;
 	private int renderListCurrent;
 	private int renderListSize;
@@ -67,7 +70,6 @@ public class WorldSchematicVisualizer {
 	private double pPosX, pPosY, pPosZ; //Corrected player position
 	private int updateOffset; //Which Chunk to update next
 	
-	private Field bufferSizeField;
 	
 	public TileSchematicBuilder vTile;
 	public TileSchematicBuilder fTile;
@@ -91,15 +93,8 @@ public class WorldSchematicVisualizer {
 	
 	public WorldSchematicVisualizer() {
 		instance = this;
+		tessellator = new Tessellator(2097152);
 		
-		//Set private field public for checking if a chunk has nothing rendered
-		try {
-			bufferSizeField = ReflectionHelper.findField(Tessellator.class, "rawBufferIndex", "field_147569_p");
-		}
-		catch (Exception e) {
-			ModLog.logger.error("Unable to get 'rawBufferIndex' field from Tessellator. Unable to render preview!");
-			bufferSizeField = null;
-		}
 	}
 	
 	@SubscribeEvent(priority=EventPriority.HIGHEST)
@@ -132,56 +127,12 @@ public class WorldSchematicVisualizer {
 	}
 	
 	private void renderProgress() {
-		if(!progressRender.render)
+		if(!progressRender.render || vTile == null || vTile.loadedSchematic == null)
 			return;
 		
 		WorldRenderer renderer = Tessellator.getInstance().getWorldRenderer();
 		
-		/*renderer.begin(glMode, format);
-		t.setTranslation(progressRender.targetX - pPosX, progressRender.targetY - pPosY, (progressRender.targetZ+1) - pPosZ);
 		
-		//Draw Cube
-		//Front
-		t.setColorRGBA(255, 0, 0, 255);
-		t.addVertex(1, 0, 1);
-		t.addVertex(1, 1, 1);
-		t.addVertex(0, 1, 1);
-		t.addVertex(0, 0, 1);
-		
-		//Back
-		t.setColorRGBA(255, 0, 0, 255);
-		t.addVertex(1, 0, 0);
-		t.addVertex(1, 1, 0);
-		t.addVertex(0, 1, 0);
-		t.addVertex(0, 0, 0);
-		
-		//Left
-		t.setColorRGBA(255, 0, 0, 255);
-		t.addVertex(0, 0, 1);
-		t.addVertex(0, 1, 1);
-		t.addVertex(0, 1, 0);
-		t.addVertex(0, 0, 0);
-		
-		//Right
-		t.setColorRGBA(255, 0, 0, 255);
-		t.addVertex(1, 0, 1);
-		t.addVertex(1, 1, 1);
-		t.addVertex(1, 1, 0);
-		t.addVertex(1, 0, 0);
-		
-		//Top
-		t.setColorRGBA(255, 0, 0, 255);
-		t.addVertex(1, 1, 1);
-		t.addVertex(1, 1, 0);
-		t.addVertex(0, 1, 0);
-		t.addVertex(0, 1, 1);
-		
-		//Bottom
-		t.setColorRGBA(255, 0, 0, 255);
-		t.addVertex(1, 0, 1);
-		t.addVertex(1, 0, 0);
-		t.addVertex(0, 0, 0);
-		t.addVertex(0, 0, 1);
 		
 		//GL11.glEnable(GL11.GL_BLEND);
 		//GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
@@ -190,17 +141,17 @@ public class WorldSchematicVisualizer {
 		GL11.glDepthMask(false);
 		GL11.glDisable(GL11.GL_DEPTH_TEST);
 		
-		Tessellator.instance.draw();
-		Tessellator.instance.setTranslation(0, 0, 0);
+		//Tessellator.instance.draw();
+		//Tessellator.instance.setTranslation(0, 0, 0);
 		
 		GL11.glDepthMask(true);
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glEnable(GL11.GL_CULL_FACE);
-		//GL11.glDisable(GL11.GL_BLEND);*/
+		//GL11.glDisable(GL11.GL_BLEND);
 	}
 
 	public void renderVisualize() {
-		/*if(vTile == null || vTile.loadedSchematic == null || bufferSizeField == null)
+		if(vTile == null || vTile.loadedSchematic == null)
 			return;
 		
 		Schematic schematic = vTile.loadedSchematic;
@@ -232,24 +183,19 @@ public class WorldSchematicVisualizer {
 			gotFloor = false;
 		}
 		
-		//Prepare rendering
-		GL11.glEnable(GL11.GL_BLEND);
-		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-		GL11.glColor4f(1.0F, 1.0F, 1.0F, 0.5F);
-		
+		//Prepare rendering		
         Minecraft.getMinecraft().getTextureManager().bindTexture(TextureMap.locationBlocksTexture);
 		
 		vTile.updateDirection();
 		
 		if(vTile.schematicCache == null)
-			vTile.schematicCache = new WorldCache(schematic);
-		RenderBlocks renderBlocksRi = new RenderBlocks(vTile.schematicCache);
-		renderBlocksRi.enableAO = false;
+			vTile.schematicCache = new WorldCache(schematic, vTile.resources);
+		WorldRenderer renderBlocksRi = tessellator.getWorldRenderer();
 		
 		//Render in 16x16x16 chunks to cache
 		if(renderChunks.size() < chunkCountX*chunkCountY*chunkCountZ) //First time render
 		{
-			int updateChunksPerFrame = 5; //How many chunks to render into cache this frame
+			int updateChunksPerFrame = 1; //How many chunks to render into cache this frame
 			int chunksUpdated = 0; 
 			boolean stopRender = false;
 			
@@ -268,6 +214,8 @@ public class WorldSchematicVisualizer {
 						if(listIndex >= renderListStart+renderListSize)
 						{
 							System.err.println("Error creating new OpenGL Render list. Not enough indexes!");
+							System.err.println("listStart: " + renderListStart + " Current: " + listIndex + " Size: " + renderListSize);
+							System.err.println("ChunkX: " + chunkX + " ChunkY: " + chunkY + " ChunkZ: " + chunkZ);
 							vTile = null;
 							clearRenderCache();
 							return;
@@ -277,20 +225,19 @@ public class WorldSchematicVisualizer {
 						GL11.glNewList(listIndex, GL11.GL_COMPILE);
 						
 						//Render Chunk
-						Tessellator.instance.startDrawingQuads();
-						Tessellator.instance.disableColor();
+						renderBlocksRi.begin(7, DefaultVertexFormats.BLOCK);
+						renderBlocksRi.noColor();
 						renderChunk(chunkX, chunkY, chunkZ, chunkSize, renderBlocksRi, gotFloor);
 						
-						try {
-							if(bufferSizeField.getInt(Tessellator.instance) > 0)
-							{
-								chunksUpdated++;
-								renderChunks.add(new RenderCache(chunkX, chunkY, chunkZ, listIndex));
-							}
-							else
-								renderChunks.add(null);
-						} catch(Exception e) {}
-						Tessellator.instance.draw(); //Render and reset state
+						if(renderBlocksRi.getVertexCount() > 0)
+						{
+							chunksUpdated++;
+							renderChunks.add(new RenderCache(chunkX, chunkY, chunkZ, listIndex));
+						}
+						else
+							renderChunks.add(null);
+
+						tessellator.draw();
 						
 						GL11.glEndList();
 						
@@ -341,10 +288,9 @@ public class WorldSchematicVisualizer {
 			updateOffset = 0;
 		int updateCount = 0;
 		
-		//Render cached chunks
-		renderList.resetList();
-		renderList.setupRenderList(0, 0, 0, 0, 0, 0);
+		//Update chunk cache, and add cached in range to rendering list
 		int renderChunkRadius = Minecraft.getMinecraft().gameSettings.renderDistanceChunks;
+		ArrayList<Integer> renderLists = new ArrayList<Integer>();
 		for(RenderCache cache : sortedCache)
 		{
 			if(cache == null)
@@ -360,42 +306,46 @@ public class WorldSchematicVisualizer {
 			float dz = (float) (pPosZ - chunkPosZ);
 			
 			float distance = (float) Math.sqrt(dx*dx + dy*dy + dz*dz);
-			
 			if(distance <= renderChunkRadius*chunkSize)
 			{
 				if(updateCount++ == updateOffset)
 				{
-					
+					//Update the Chunk render cache
 					GL11.glNewList(cache.renderListIndex, GL11.GL_COMPILE);
 					
 					//Render Chunk
-					Tessellator.instance.startDrawingQuads();
-					Tessellator.instance.disableColor();
+					renderBlocksRi.begin(7, DefaultVertexFormats.BLOCK);
+					renderBlocksRi.noColor();
 					renderChunk(cache.chunkX, cache.chunkY, cache.chunkZ, chunkSize, renderBlocksRi, gotFloor);
-					Tessellator.instance.draw(); //Render and reset state
+					tessellator.draw(); //Render and reset state
 					
 					GL11.glEndList();
 				}
 				
-				//Add to list of lists to render
-				renderList.addGLRenderList(cache.renderListIndex);
-				
+				renderLists.add(cache.renderListIndex);
 			}
 		}
 		
+		//Render
+		GL11.glEnable(GL11.GL_BLEND);
+		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+		GL11.glColor4f(1.0F, 1.0F, 1.0F, 0.5F);
+		
 		GL11.glPushMatrix();
 		GL11.glTranslatef(vTile.buildX - (float)pPosX, renderY, (vTile.buildZ+1) - (float)pPosZ);
-		
-		renderList.callLists();
+		for(int index : renderLists)
+			GL11.glCallList(index);
 		
 		mc.gameSettings.ambientOcclusion = ambientOcclusion;
 		
 		GL11.glPopMatrix();
-		GL11.glDisable(GL11.GL_BLEND);*/
+		GL11.glDisable(GL11.GL_BLEND);
 	}
-	/*
-	protected void renderChunk(int chunkX, int chunkY, int chunkZ, int chunkSize, RenderBlocks renderBlocksRi, boolean gotFloor) {
+	
+	protected void renderChunk(int chunkX, int chunkY, int chunkZ, int chunkSize, WorldRenderer renderBlocksRi, boolean gotFloor) {
 		Schematic schematic = vTile.loadedSchematic;
+		Minecraft mc = Minecraft.getMinecraft();
+		BlockRendererDispatcher render = mc.getBlockRendererDispatcher();
 		
 		for(int x = chunkX*chunkSize; x < schematic.getWidth() && x < (chunkX+1) * chunkSize; x++)
 		{
@@ -405,44 +355,57 @@ public class WorldSchematicVisualizer {
 				{
 					if(y >= 0)
 					{
-						SchematicBlock block = schematic.getBlock(x, y, z);
-						if(block == null)
-							continue;
-						
-						ResourceItem resource = ResourceManager.getResource(vTile.resources, block.getSchematicBlockId(), block.getSchematicMeta());
-						if(resource == null)
-							continue;
-
-						Block realBlock = resource.getBlock();
-						if(realBlock == null || realBlock.getMaterial() == Material.air)
+						BlockPos pos = new BlockPos(x,y,z);
+						IBlockState realBlock = vTile.schematicCache.getBlockState(pos);
+						if(realBlock == null || realBlock.getBlock() == Blocks.air)
 							continue;
 
 						int worldY = y;
 						if(gotFloor)
 							worldY++;
 
-						Block worldBlock = vTile.getWorldObj().getBlock(vTile.buildX+x, vTile.yCoord+worldY, (vTile.buildZ+1)+z);
-						if(worldBlock != Blocks.air)
+						IBlockState blockState = vTile.getWorld().getBlockState(new BlockPos(vTile.buildX+x, vTile.getPos().getY()+worldY, (vTile.buildZ+1)+z));
+						if(blockState.getBlock() != Blocks.air)
 							continue;
-
-						renderBlocksRi.renderBlockByRenderType(realBlock, x, y, z);
+						
+						try {
+							render.renderBlock(realBlock, pos, vTile.schematicCache, renderBlocksRi);
+						} catch(Exception e) {
+							if(ModSchematicBuilder.debug) {
+								ModLog.logger.warn("Failed to render block: " + blockState + " | " + e.getMessage());
+							}
+						}
 					}
 					else
 					{
-						Block worldBlock = vTile.getWorldObj().getBlock(vTile.buildX+x, vTile.yCoord+(y+1), (vTile.buildZ+1)+z);
-						if(worldBlock != Blocks.air)
-							continue;
-						renderBlocksRi.renderBlockByRenderType((Block)Block.blockRegistry.getObjectById(vTile.config.floorBlock.getBlockId()), x, y, z);
+						ResourceItem floorBlock = vTile.config.floorBlock;
+						Block realBlock;
+						IBlockState blockState;
+						IBlockState realBlockState;
+						if(floorBlock != null) {
+							realBlock = floorBlock.getBlock();
+							
+							blockState = vTile.getWorld().getBlockState(new BlockPos(vTile.buildX+x, vTile.getPos().getY()+(y+1), (vTile.buildZ+1)+z));
+							if(blockState.getBlock() != Blocks.air)
+								continue;
+							
+							try {
+								realBlockState = realBlock.getStateFromMeta(floorBlock.getMeta());
+							} catch(Exception e) {
+								realBlockState = realBlock.getDefaultState();
+							}
+							
+							render.renderBlock(realBlockState, new BlockPos(x,y,z), vTile.schematicCache, renderBlocksRi);
+						}
 					}
 				}
 			}
 		}
-	}*/
+	}
 	
 	private void newRenderCache(int size) {
 		if(renderChunks.size() > 0)
 			clearRenderCache();
-		renderList = new RenderList();
 		renderListStart = GL11.glGenLists(size);
 		renderListCurrent = renderListStart;
 		
@@ -458,7 +421,6 @@ public class WorldSchematicVisualizer {
 	private void clearRenderCache() {
 		cachedSchematic = null;
 		renderChunks.clear();
-		renderList = null;
 		if(renderListSize > 0)
 		{
 			GL11.glDeleteLists(renderListStart, renderListSize);
