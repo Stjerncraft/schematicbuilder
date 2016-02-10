@@ -26,6 +26,8 @@ import com.wildex999.schematicbuilder.ResourceItem;
 import com.wildex999.schematicbuilder.ResourceManager;
 import com.wildex999.schematicbuilder.WorldCache;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
+import com.wildex999.schematicbuilder.blocks.BlockCreativeSchematicBuilder;
+import com.wildex999.schematicbuilder.blocks.BlockLibrary;
 import com.wildex999.schematicbuilder.blocks.BlockSchematicBuilder;
 import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.schematicbuilder.config.IConfigListener;
@@ -51,7 +53,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.renderer.texture.ITickable;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
@@ -67,7 +68,9 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.IChatComponent;
+import net.minecraft.util.ITickable;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.common.Optional;
 import net.minecraftforge.fml.common.registry.FMLControlledNamespacedRegistry;
@@ -76,7 +79,7 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 @Optional.Interface(iface = "cofh.api.energy.IEnergyHandler", modid = "CoFHAPI|energy")
-public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiWatchers, IConfigListener, ISidedInventory, cofh.api.energy.IEnergyHandler {
+public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiWatchers, IConfigListener, ISidedInventory, cofh.api.energy.IEnergyReceiver {
 
 	protected final static String inventoryName = "Schematic Builder";
 	
@@ -305,7 +308,15 @@ public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiW
 	}
 	
 	@Override
-	public void tick() {	
+	public boolean shouldRefresh(World world, BlockPos pos, IBlockState oldState, IBlockState newState) {
+		Block newBlock = newState.getBlock();
+		if(newBlock != BlockLibrary.schematicBuilder && newBlock != BlockLibrary.creativeSchematicBuilder)
+			return true;
+		return false;
+	};
+	
+	@Override
+	public void update() {	
 		if(!initialized) {
 			if(!worldObj.isRemote && state == BuilderState.WAITINGFORSERVER)
 				state = BuilderState.IDLE;
@@ -2443,12 +2454,6 @@ public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiW
 	public int receiveEnergy(EnumFacing from, int maxReceive,
 			boolean simulate) {
 		return energyStorage.receiveEnergy(maxReceive, simulate);
-	}
-
-	@Override
-	public int extractEnergy(EnumFacing from, int maxExtract,
-			boolean simulate) {
-		return energyStorage.extractEnergy(maxExtract, simulate);
 	}
 
 	@Override

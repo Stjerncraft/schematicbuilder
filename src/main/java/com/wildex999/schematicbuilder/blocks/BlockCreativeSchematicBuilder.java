@@ -3,6 +3,7 @@ package com.wildex999.schematicbuilder.blocks;
 import com.wildex999.schematicbuilder.ModSchematicBuilder;
 import com.wildex999.schematicbuilder.items.ItemCreativeSchematicBuilder;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
+import com.wildex999.utils.ModLog;
 
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
@@ -28,12 +29,13 @@ public class BlockCreativeSchematicBuilder extends BlockSchematicBuilder {
     	TileEntity te = world.getTileEntity(pos);
     	if(te == null || !(te instanceof TileSchematicBuilder))
     	{
-    		System.err.println("Expected TileSchematicBuilder at " + pos);
+    		ModLog.logger.error("Expected TileSchematicBuilder at " + pos);
     		return;
     	}
     	TileSchematicBuilder tileBuilder = (TileSchematicBuilder) te;
     	
     	tileBuilder.isCreative = true;
+    	
 		
 		super.onBlockPlacedBy(world, pos, state, placer, item);
 	}
