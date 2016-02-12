@@ -135,33 +135,42 @@ public class MessageActionSchematicBuilder extends MessageBase {
 	public static class Handler implements IMessageHandler<MessageActionSchematicBuilder, IMessage> {
         
         @Override
-        public IMessage onMessage(MessageActionSchematicBuilder message, MessageContext ctx) {
-        	World world = getWorld(ctx);
-        	TileEntity baseTile = message.tileInfo.getTileEntity(world);
-        	
-        	if(!(baseTile instanceof TileSchematicBuilder))
-        		return null;
-        	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
+        public IMessage onMessage(final MessageActionSchematicBuilder message, final MessageContext ctx) {
+        	//Run in Server thread
+        	final EntityPlayerMP sendingPlayer = ctx.getServerHandler().playerEntity;
+        	sendingPlayer.getServerForPlayer().addScheduledTask(new Runnable() {
+				
+				@Override
+				public void run() {
+					World world = getWorld(ctx);
+		        	TileEntity baseTile = message.tileInfo.getTileEntity(world);
+		        	
+		        	if(!(baseTile instanceof TileSchematicBuilder))
+		        		return;
+		        	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
 
-        	switch(message.action) {
-        	case BUILD:
-        		tile.actionBuild();
-        		break;
-        	case STOP:
-        		tile.actionStop();
-        		break;
-        	case CONFIG:
-        		tile.actionConfig(message.config);
-        		break;
-        	case DOWNLOAD:
-        		tile.actionDownload(ctx.getServerHandler().playerEntity);
-        		break;
-        	case PROGRESS:
-        		tile.actionProgress(ctx.getServerHandler().playerEntity);
-        		break;
-        	case RESOURCESWAP:
-        		tile.actionSwapResource(ctx.getServerHandler().playerEntity, message.resource);
-        	}
+		        	switch(message.action) {
+		        	case BUILD:
+		        		tile.actionBuild();
+		        		break;
+		        	case STOP:
+		        		tile.actionStop();
+		        		break;
+		        	case CONFIG:
+		        		tile.actionConfig(message.config);
+		        		break;
+		        	case DOWNLOAD:
+		        		tile.actionDownload(ctx.getServerHandler().playerEntity);
+		        		break;
+		        	case PROGRESS:
+		        		tile.actionProgress(ctx.getServerHandler().playerEntity);
+		        		break;
+		        	case RESOURCESWAP:
+		        		tile.actionSwapResource(ctx.getServerHandler().playerEntity, message.resource);
+		        	}
+				}
+			});
+        	
         	
         	return null;
         }

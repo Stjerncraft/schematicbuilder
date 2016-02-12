@@ -373,8 +373,8 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 		try {
 			if(schematic != null && renderSchematic)
 			{
-				if(gui.tile.schematicCache == null)
-					gui.tile.schematicCache = new WorldCache(schematic, gui.tile.resources);
+				if(gui.tile.schematicWorldCache == null)
+					gui.tile.schematicWorldCache = new WorldCache(schematic, gui.tile.resources);
 				WorldRenderer renderBlocksRi = tessellator.getWorldRenderer();
 				renderBlocks(texMan, renderBlocksRi, schematic);
 			}
@@ -674,12 +674,12 @@ public class GuiSchematicBuilderMain extends GuiScreenExt implements IGuiTabEntr
 				for(int z = chunkZ*chunkSize; z < schematic.getLength() && z < (chunkZ+1) * chunkSize; z++)
 				{
 					BlockPos pos = new BlockPos(x,y,z);
-					IBlockState realBlock = gui.tile.schematicCache.getBlockState(pos);
+					IBlockState realBlock = gui.tile.schematicWorldCache.getBlockState(pos);
 					if(realBlock == null || realBlock.getBlock() == Blocks.air)
 						continue;
 					
 					try {
-						render.renderBlock(realBlock, pos, gui.tile.schematicCache, renderBlocksRi);
+						render.renderBlock(realBlock, pos, gui.tile.schematicWorldCache, renderBlocksRi);
 					} catch(Exception e) {
 						if(ModSchematicBuilder.debug)
 							ModLog.logger.warn("Failed to render block: " + realBlock);

@@ -11,6 +11,7 @@ import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 import com.wildex999.utils.ModLog;
 
 import io.netty.buffer.ByteBuf;
+import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
@@ -238,34 +239,40 @@ public class MessageUpdateSchematicBuilder extends MessageBase {
 	public static class Handler implements IMessageHandler<MessageUpdateSchematicBuilder, IMessage> {
         
         @Override
-        public IMessage onMessage(MessageUpdateSchematicBuilder message, MessageContext ctx) {
-        	World world = getWorld(ctx);
-        	TileEntity baseTile = message.tileInfo.getTileEntity(world);
-        	
-        	if(!(baseTile instanceof TileSchematicBuilder))
-        		return null;
-        	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
-        
-        	
-        	switch(message.updateType)
-        	{
-        	case FULL:
-        		tile.networkUpdateFull(message.newState, message.schematicName, message.schematicAuthor, message.message, message.schematicId, 
-        								message.schematicWidth, message.schematicHeight, message.schematicLength, message.config, message.hasPreviousOutput);
-        		break;
-        	case MESSAGE:
-        		tile.networkUpdateMessage(message.newState, message.message);
-        		break;
-        	case CONFIG:
-        		tile.networkUpdateConfig(message.config);
-        		break;
-        	case RESOURCE:
-        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, message.resources, message.floorPlaced, message.floorStored);
-        		break;
-        	case RESOURCELIST:
-        		tile.networkUpdateResourceList(message.resources);
-        		break;
-        	}
+        public IMessage onMessage(final MessageUpdateSchematicBuilder message, final MessageContext ctx) {
+        	Minecraft.getMinecraft().addScheduledTask(new Runnable() {
+				
+				@Override
+				public void run() {
+					World world = getWorld(ctx);
+		        	TileEntity baseTile = message.tileInfo.getTileEntity(world);
+		        	
+		        	if(!(baseTile instanceof TileSchematicBuilder))
+		        		return;
+		        	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
+		        
+		        	
+		        	switch(message.updateType)
+		        	{
+		        	case FULL:
+		        		tile.networkUpdateFull(message.newState, message.schematicName, message.schematicAuthor, message.message, message.schematicId, 
+		        								message.schematicWidth, message.schematicHeight, message.schematicLength, message.config, message.hasPreviousOutput);
+		        		break;
+		        	case MESSAGE:
+		        		tile.networkUpdateMessage(message.newState, message.message);
+		        		break;
+		        	case CONFIG:
+		        		tile.networkUpdateConfig(message.config);
+		        		break;
+		        	case RESOURCE:
+		        		tile.networkUpdateResource(message.energyCurrent, message.energyMax, message.resources, message.floorPlaced, message.floorStored);
+		        		break;
+		        	case RESOURCELIST:
+		        		tile.networkUpdateResourceList(message.resources);
+		        		break;
+		        	}
+				}
+			});
         	
         	return null;
         }

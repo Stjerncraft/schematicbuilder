@@ -7,6 +7,7 @@ import java.util.Map;
 import com.wildex999.schematicbuilder.WorldSchematicVisualizer;
 
 import io.netty.buffer.ByteBuf;
+import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
@@ -102,19 +103,25 @@ public class MessageUpdateProgress extends MessageBase {
 	public static class Handler implements IMessageHandler<MessageUpdateProgress, IMessage> {
         
         @Override
-        public IMessage onMessage(MessageUpdateProgress message, MessageContext ctx) {
+        public IMessage onMessage(final MessageUpdateProgress message, final MessageContext ctx) {
 
-        	WorldSchematicVisualizer visualizer = WorldSchematicVisualizer.instance;
-        	switch(message.type) {
-        	case STOP:
-        		visualizer.progressRender.render = false;
-        		break;
-        	case BUILDER:
-        		visualizer.progressRender.targetX = message.targetX;
-        		visualizer.progressRender.targetY = message.targetY;
-        		visualizer.progressRender.targetZ = message.targetZ;
-        		break;
-        	}
+        	Minecraft.getMinecraft().addScheduledTask(new Runnable() {
+				
+				@Override
+				public void run() {
+		        	WorldSchematicVisualizer visualizer = WorldSchematicVisualizer.instance;
+		        	switch(message.type) {
+		        	case STOP:
+		        		visualizer.progressRender.render = false;
+		        		break;
+		        	case BUILDER:
+		        		visualizer.progressRender.targetX = message.targetX;
+		        		visualizer.progressRender.targetY = message.targetY;
+		        		visualizer.progressRender.targetZ = message.targetZ;
+		        		break;
+		        	}
+				}
+			});
         	
         	return null;
         }

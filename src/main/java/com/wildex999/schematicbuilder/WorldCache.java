@@ -139,6 +139,39 @@ public class WorldCache extends World {
 		blocks.add(block);
 	}
 	
+	//Re-apply the resources for the blocks
+	public void refreshBlocks(HashMap<Short, ResourceItem> resourceMap) {
+		for(int x = 0; x < width; x++)
+		{
+			for(int y = 0; y < height; y++)
+			{
+				for(int z = 0; z < length; z++)
+				{
+					SchematicBlock schematicBlock = schematic.getBlock(x, y, z);
+					IBlockState blockState = null;
+					if(schematicBlock != null)
+					{
+						short blockId = schematicBlock.getSchematicBlockId();
+						byte meta = schematicBlock.getSchematicMeta();
+						ResourceItem resource = ResourceManager.getResource(resourceMap, blockId, meta);
+						if(resource != null) {
+							try {
+								blockState = resource.getBlock().getStateFromMeta(resource.getMeta());
+							} catch(Exception e) {
+								blockState = resource.getBlock().getDefaultState();
+							}
+						}
+					}
+					
+					if(blockState != null)
+						blocks.set(getIndex(x,y,z), blockState);
+					else
+						blocks.set(getIndex(x,y,z), Blocks.air.getDefaultState());
+				}
+			}
+		}
+	}
+	
 	public Schematic getSchematic() {
 		return schematic;
 	}

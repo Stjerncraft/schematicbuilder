@@ -9,6 +9,7 @@ import com.wildex999.schematicbuilder.config.ConfigurationManager;
 import com.wildex999.utils.ModLog;
 
 import io.netty.buffer.ByteBuf;
+import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
@@ -94,32 +95,38 @@ public class MessageConfigUpdate extends MessageBase implements IMessageHandler<
 	}
 
     @Override
-    public IMessage onMessage(MessageConfigUpdate message, MessageContext ctx) {
+    public IMessage onMessage(final MessageConfigUpdate message, final MessageContext ctx) {
     	//TODO: If receiving on server side, check if player is allowed to make these changes
     	if(ctx.side == Side.SERVER)
     	{
     		System.out.println("Received Config update on Server, this is not yet implemented!");
     		return null;
     	}
+    	Minecraft.getMinecraft().addScheduledTask(new Runnable() {
+			
+			@Override
+			public void run() {
+				if(ModSchematicBuilder.debug)
+		    		System.out.println("Client received Config update from server for type " + message.type);
+		    	
+		    	switch(message.type)
+		    	{
+		    	case GENERAL:
+		    		if(!error)
+		    		{
+		    			ModSchematicBuilder.configGeneral.saveConfig(false); //Save changes to local config
+		    			ModSchematicBuilder.configGeneral.reload(false); //Notify of changes
+		    		}
+		    		else
+		    			ModSchematicBuilder.configGeneral.reload(true); //Config might be in an unknown/invalid state, reload from local config
+		    		break;
+		    	case RESOURCE:
+		    		break;
+		    	}
+			}
+		});
     	
     	
-    	if(ModSchematicBuilder.debug)
-    		System.out.println("Client received Config update from server for type " + message.type);
-    	
-    	switch(message.type)
-    	{
-    	case GENERAL:
-    		if(!error)
-    		{
-    			ModSchematicBuilder.configGeneral.saveConfig(false); //Save changes to local config
-    			ModSchematicBuilder.configGeneral.reload(false); //Notify of changes
-    		}
-    		else
-    			ModSchematicBuilder.configGeneral.reload(true); //Config might be in an unknown/invalid state, reload from local config
-    		break;
-    	case RESOURCE:
-    		break;
-    	}
     	
     	return null;
     }

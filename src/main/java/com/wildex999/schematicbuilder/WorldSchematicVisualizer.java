@@ -24,6 +24,7 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.BlockPos;
@@ -65,6 +66,8 @@ public class WorldSchematicVisualizer {
 	private int renderListCurrent;
 	private int renderListSize;
 	
+	//Remove color from the format, as we want to set our own alpha
+	VertexFormat customFormat = new VertexFormat();
 	
 	private int chunkSize = 16;
 	private double pPosX, pPosY, pPosZ; //Corrected player position
@@ -95,9 +98,12 @@ public class WorldSchematicVisualizer {
 		instance = this;
 		tessellator = new Tessellator(2097152);
 		
+		customFormat.addElement(DefaultVertexFormats.POSITION_3F);
+	    customFormat.addElement(DefaultVertexFormats.TEX_2F);
+	    customFormat.addElement(DefaultVertexFormats.TEX_2S);
 	}
 	
-	@SubscribeEvent(priority=EventPriority.HIGHEST)
+	@SubscribeEvent(priority=EventPriority.LOWEST)
 	public void renderWorldLastEvent(RenderWorldLastEvent event) {
 		if((vTile == null || vTile.loadedSchematic == null) && (fTile == null || fTile.loadedSchematic == null))
 		{
@@ -130,24 +136,63 @@ public class WorldSchematicVisualizer {
 		if(!progressRender.render || vTile == null || vTile.loadedSchematic == null)
 			return;
 		
-		WorldRenderer renderer = Tessellator.getInstance().getWorldRenderer();
-		
-		
-		
-		//GL11.glEnable(GL11.GL_BLEND);
-		//GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-		//GL11.glColor4f(1F, 0F, 0F, 0.5F);
+		Minecraft mc = Minecraft.getMinecraft();
+		WorldRenderer renderer = tessellator.getWorldRenderer();
+			
+		GL11.glEnable(GL11.GL_BLEND);
+		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+		GL11.glColor4f(1F, 0F, 0F, 1F);
 		GL11.glDisable(GL11.GL_CULL_FACE);
 		GL11.glDepthMask(false);
 		GL11.glDisable(GL11.GL_DEPTH_TEST);
 		
-		//Tessellator.instance.draw();
-		//Tessellator.instance.setTranslation(0, 0, 0);
+		renderer.begin(7, DefaultVertexFormats.POSITION);
+		renderer.setTranslation(progressRender.targetX - pPosX, progressRender.targetY - pPosY, (progressRender.targetZ+1) - pPosZ);
+		
+		//Front
+		renderer.pos(1, 0, 1).endVertex();
+		renderer.pos(1, 1, 1).endVertex();
+		renderer.pos(0, 1, 1).endVertex();
+		renderer.pos(0, 0, 1).endVertex();
+		
+		//Back
+		renderer.pos(1, 0, 0).endVertex();
+		renderer.pos(1, 1, 0).endVertex();
+		renderer.pos(0, 1, 0).endVertex();
+		renderer.pos(0, 0, 0).endVertex();
+		
+		//Left
+		renderer.pos(0, 0, 1).endVertex();
+		renderer.pos(0, 1, 1).endVertex();
+		renderer.pos(0, 1, 0).endVertex();
+		renderer.pos(0, 0, 0).endVertex();
+		
+		//Right
+		renderer.pos(1, 0, 1).endVertex();
+		renderer.pos(1, 1, 1).endVertex();
+		renderer.pos(1, 1, 0).endVertex();
+		renderer.pos(1, 0, 0).endVertex();
+		
+		//Top
+		renderer.pos(1, 1, 1).endVertex();
+		renderer.pos(1, 1, 0).endVertex();
+		renderer.pos(0, 1, 0).endVertex();
+		renderer.pos(0, 1, 1).endVertex();
+		
+		//Bottom
+		renderer.pos(1, 0, 1).endVertex();
+		renderer.pos(1, 0, 0).endVertex();
+		renderer.pos(0, 0, 0).endVertex();
+		renderer.pos(0, 0, 1).endVertex();
+		
+		tessellator.draw();
+		renderer.setTranslation(0, 0, 0);
+
 		
 		GL11.glDepthMask(true);
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glEnable(GL11.GL_CULL_FACE);
-		//GL11.glDisable(GL11.GL_BLEND);
+		GL11.glDisable(GL11.GL_BLEND);
 	}
 
 	public void renderVisualize() {
@@ -169,6 +214,8 @@ public class WorldSchematicVisualizer {
 			cachedSchematic = vTile.loadedSchematic;
 			resourceVersion = vTile.resourceVersion;
 		}
+		if(vTile.schematicWorldCache == null)
+			vTile.schematicWorldCache = new WorldCache(schematic, vTile.resources);
 		
 		boolean gotFloor;
 		float renderY;
@@ -188,8 +235,6 @@ public class WorldSchematicVisualizer {
 		
 		vTile.updateDirection();
 		
-		if(vTile.schematicCache == null)
-			vTile.schematicCache = new WorldCache(schematic, vTile.resources);
 		WorldRenderer renderBlocksRi = tessellator.getWorldRenderer();
 		
 		//Render in 16x16x16 chunks to cache
@@ -225,7 +270,7 @@ public class WorldSchematicVisualizer {
 						GL11.glNewList(listIndex, GL11.GL_COMPILE);
 						
 						//Render Chunk
-						renderBlocksRi.begin(7, DefaultVertexFormats.BLOCK);
+						renderBlocksRi.begin(7, customFormat);
 						renderBlocksRi.noColor();
 						renderChunk(chunkX, chunkY, chunkZ, chunkSize, renderBlocksRi, gotFloor);
 						
@@ -314,7 +359,7 @@ public class WorldSchematicVisualizer {
 					GL11.glNewList(cache.renderListIndex, GL11.GL_COMPILE);
 					
 					//Render Chunk
-					renderBlocksRi.begin(7, DefaultVertexFormats.BLOCK);
+					renderBlocksRi.begin(7, customFormat);
 					renderBlocksRi.noColor();
 					renderChunk(cache.chunkX, cache.chunkY, cache.chunkZ, chunkSize, renderBlocksRi, gotFloor);
 					tessellator.draw(); //Render and reset state
@@ -353,52 +398,55 @@ public class WorldSchematicVisualizer {
 			{
 				for(int z = chunkZ*chunkSize; z < schematic.getLength() && z < (chunkZ+1) * chunkSize; z++)
 				{
-					if(y >= 0)
-					{
-						BlockPos pos = new BlockPos(x,y,z);
-						IBlockState realBlock = vTile.schematicCache.getBlockState(pos);
-						if(realBlock == null || realBlock.getBlock() == Blocks.air)
-							continue;
-
-						int worldY = y;
-						if(gotFloor)
-							worldY++;
-
-						IBlockState blockState = vTile.getWorld().getBlockState(new BlockPos(vTile.buildX+x, vTile.getPos().getY()+worldY, (vTile.buildZ+1)+z));
-						if(blockState.getBlock() != Blocks.air)
-							continue;
-						
-						try {
-							render.renderBlock(realBlock, pos, vTile.schematicCache, renderBlocksRi);
-						} catch(Exception e) {
-							if(ModSchematicBuilder.debug) {
-								ModLog.logger.warn("Failed to render block: " + blockState + " | " + e.getMessage());
-							}
-						}
-					}
-					else
-					{
-						ResourceItem floorBlock = vTile.config.floorBlock;
-						Block realBlock;
-						IBlockState blockState;
-						IBlockState realBlockState;
-						if(floorBlock != null) {
-							realBlock = floorBlock.getBlock();
-							
-							blockState = vTile.getWorld().getBlockState(new BlockPos(vTile.buildX+x, vTile.getPos().getY()+(y+1), (vTile.buildZ+1)+z));
-							if(blockState.getBlock() != Blocks.air)
-								continue;
-							
-							try {
-								realBlockState = realBlock.getStateFromMeta(floorBlock.getMeta());
-							} catch(Exception e) {
-								realBlockState = realBlock.getDefaultState();
-							}
-							
-							render.renderBlock(realBlockState, new BlockPos(x,y,z), vTile.schematicCache, renderBlocksRi);
-						}
-					}
+					renderBlock(new BlockPos(x,y,z), render, renderBlocksRi, true, gotFloor);
 				}
+			}
+		}
+	}
+	
+	protected void renderBlock(BlockPos pos, BlockRendererDispatcher render, WorldRenderer renderBlocksRi, boolean skipIfNotAir, boolean gotFloor) {
+		if(pos.getY() >= 0)
+		{
+			IBlockState realBlock = vTile.schematicWorldCache.getBlockState(pos);
+			if(realBlock == null || realBlock.getBlock() == Blocks.air)
+				return;
+
+			int worldY = pos.getY();
+			if(gotFloor)
+				worldY++;
+
+			IBlockState blockState = vTile.getWorld().getBlockState(new BlockPos(vTile.buildX+pos.getX(), vTile.getPos().getY()+worldY, (vTile.buildZ+1)+pos.getZ()));
+			if(skipIfNotAir && blockState.getBlock() != Blocks.air)
+				return;
+			
+			try {
+				render.renderBlock(realBlock, pos, vTile.schematicWorldCache, renderBlocksRi);
+			} catch(Exception e) {
+				if(ModSchematicBuilder.debug) {
+					ModLog.logger.warn("Failed to render block: " + blockState + " | " + e.getMessage());
+				}
+			}
+		}
+		else
+		{
+			ResourceItem floorBlock = vTile.config.floorBlock;
+			Block realBlock;
+			IBlockState blockState;
+			IBlockState realBlockState;
+			if(floorBlock != null) {
+				realBlock = floorBlock.getBlock();
+				
+				blockState = vTile.getWorld().getBlockState(new BlockPos(vTile.buildX+pos.getX(), vTile.getPos().getY()+(pos.getY()+1), (vTile.buildZ+1)+pos.getZ()));
+				if(skipIfNotAir && blockState.getBlock() != Blocks.air)
+					return;
+				
+				try {
+					realBlockState = realBlock.getStateFromMeta(floorBlock.getMeta());
+				} catch(Exception e) {
+					realBlockState = realBlock.getDefaultState();
+				}
+				
+				render.renderBlock(realBlockState, pos, vTile.schematicWorldCache, renderBlocksRi);
 			}
 		}
 	}
@@ -431,65 +479,60 @@ public class WorldSchematicVisualizer {
 	}
 	
 	public void renderFrame() {
-		/*if(fTile == null || fTile.loadedSchematic == null)
+		if(fTile == null || fTile.loadedSchematic == null)
 			return;
 		
 		Schematic schematic = fTile.loadedSchematic;
-		
-		Minecraft mc = Minecraft.getMinecraft();
-		EntityClientPlayerMP player = mc.thePlayer;
+		WorldRenderer renderer = tessellator.getWorldRenderer();
+		EntityPlayerSP player = Minecraft.getMinecraft().thePlayer;
 		
 		fTile.updateDirection();
 		
-		Tessellator.instance.startDrawingQuads();
+		renderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
+		renderer.setTranslation(progressRender.targetX - pPosX, progressRender.targetY - pPosY, (progressRender.targetZ+1) - pPosZ);
+		
 		if(fTile.config.placeFloor && fTile.config.floorBlock != null)
-			Tessellator.instance.setTranslation(fTile.buildX - pPosX, (fTile.yCoord+1) - pPosY, (fTile.buildZ+1) - pPosZ);
+			renderer.setTranslation(fTile.buildX - pPosX, (fTile.getPos().getY()+1) - pPosY, (fTile.buildZ+1) - pPosZ);
 		else
-			Tessellator.instance.setTranslation(fTile.buildX - pPosX, fTile.yCoord - pPosY, (fTile.buildZ+1) - pPosZ);
-		Tessellator t = Tessellator.instance;
+			renderer.setTranslation(fTile.buildX - pPosX, fTile.getPos().getY() - pPosY, (fTile.buildZ+1) - pPosZ);
 
 		//Draw Cube
 		//Front
-		t.setColorRGBA(255, 255, 255, 128);
-		t.addVertex(schematic.getWidth(), 0, schematic.getLength());
-		t.addVertex(schematic.getWidth(), schematic.getHeight(), schematic.getLength());
-		t.addVertex(0, schematic.getHeight(), schematic.getLength());
-		t.addVertex(0, 0, schematic.getLength());
+
+		renderer.pos(schematic.getWidth(), 0, schematic.getLength()).color(255, 255, 255, 128).endVertex();
+		renderer.pos(schematic.getWidth(), schematic.getHeight(), schematic.getLength()).color(255, 255, 255, 128).endVertex();
+		renderer.pos(0, schematic.getHeight(), schematic.getLength()).color(255, 255, 255, 128).endVertex();
+		renderer.pos(0, 0, schematic.getLength()).color(255, 255, 255, 128).endVertex();
 		
 		//Back
-		t.setColorRGBA(255, 255, 0, 128);
-		t.addVertex(schematic.getWidth(), 0, 0);
-		t.addVertex(schematic.getWidth(), schematic.getHeight(), 0);
-		t.addVertex(0, schematic.getHeight(), 0);
-		t.addVertex(0, 0, 0);
+		renderer.pos(schematic.getWidth(), 0, 0).color(255, 255, 0, 128).endVertex();
+		renderer.pos(schematic.getWidth(), schematic.getHeight(), 0).color(255, 255, 0, 128).endVertex();
+		renderer.pos(0, schematic.getHeight(), 0).color(255, 255, 0, 128).endVertex();
+		renderer.pos(0, 0, 0).color(255, 255, 0, 128).endVertex();
 		
 		//Left
-		t.setColorRGBA(255, 0, 255, 128);
-		t.addVertex(0, 0, schematic.getLength());
-		t.addVertex(0, schematic.getHeight(), schematic.getLength());
-		t.addVertex(0, schematic.getHeight(), 0);
-		t.addVertex(0, 0, 0);
+		renderer.pos(0, 0, schematic.getLength()).color(255, 0, 255, 128).endVertex();
+		renderer.pos(0, schematic.getHeight(), schematic.getLength()).color(255, 0, 255, 128).endVertex();
+		renderer.pos(0, schematic.getHeight(), 0).color(255, 0, 255, 128).endVertex();
+		renderer.pos(0, 0, 0).color(255, 0, 255, 128).endVertex();
 		
 		//Right
-		t.setColorRGBA(0, 255, 255, 128);
-		t.addVertex(schematic.getWidth(), 0, schematic.getLength());
-		t.addVertex(schematic.getWidth(), schematic.getHeight(), schematic.getLength());
-		t.addVertex(schematic.getWidth(), schematic.getHeight(), 0);
-		t.addVertex(schematic.getWidth(), 0, 0);
+		renderer.pos(schematic.getWidth(), 0, schematic.getLength()).color(0, 255, 255, 128).endVertex();
+		renderer.pos(schematic.getWidth(), schematic.getHeight(), schematic.getLength()).color(0, 255, 255, 128).endVertex();
+		renderer.pos(schematic.getWidth(), schematic.getHeight(), 0).color(0, 255, 255, 128).endVertex();
+		renderer.pos(schematic.getWidth(), 0, 0).color(0, 255, 255, 128).endVertex();
 		
 		//Top
-		t.setColorRGBA(128, 255, 255, 128);
-		t.addVertex(schematic.getWidth(), schematic.getHeight(), schematic.getLength());
-		t.addVertex(schematic.getWidth(), schematic.getHeight(), 0);
-		t.addVertex(0, schematic.getHeight(), 0);
-		t.addVertex(0, schematic.getHeight(), schematic.getLength());
+		renderer.pos(schematic.getWidth(), schematic.getHeight(), schematic.getLength()).color(128, 255, 255, 128).endVertex();
+		renderer.pos(schematic.getWidth(), schematic.getHeight(), 0).color(128, 255, 255, 128).endVertex();
+		renderer.pos(0, schematic.getHeight(), 0).color(128, 255, 255, 128).endVertex();
+		renderer.pos(0, schematic.getHeight(), schematic.getLength()).color(128, 255, 255, 128).endVertex();
 		
 		//Bottom
-		t.setColorRGBA(255, 128, 128, 128);
-		t.addVertex(schematic.getWidth(), 0, schematic.getLength());
-		t.addVertex(schematic.getWidth(), 0, 0);
-		t.addVertex(0, 0, 0);
-		t.addVertex(0, 0, schematic.getLength());
+		renderer.pos(schematic.getWidth(), 0, schematic.getLength()).color(255, 128, 128, 128).endVertex();
+		renderer.pos(schematic.getWidth(), 0, 0).color(255, 128, 128, 128).endVertex();
+		renderer.pos(0, 0, 0).color(255, 128, 128, 128).endVertex();
+		renderer.pos(0, 0, schematic.getLength()).color(255, 128, 128, 128).endVertex();
 		
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
@@ -497,11 +540,11 @@ public class WorldSchematicVisualizer {
 		GL11.glDisable(GL11.GL_CULL_FACE);
 		GL11.glDepthMask(false);
 		
-		Tessellator.instance.draw();
-		Tessellator.instance.setTranslation(0, 0, 0);
+		tessellator.draw();
+		renderer.setTranslation(0, 0, 0);
 		
 		GL11.glDepthMask(true);
 		GL11.glDisable(GL11.GL_BLEND);
-*/
+
 	}
 }

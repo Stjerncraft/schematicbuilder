@@ -188,7 +188,7 @@ public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiW
 	@SideOnly(Side.CLIENT)
 	public String filePath;
 	@SideOnly(Side.CLIENT)
-	public WorldCache schematicCache;
+	public WorldCache schematicWorldCache;
 	
 	private Set<EntityPlayer> watchers;
 	private int resourceUpdateFreq = 20; //Number of ticks between resource update to client
@@ -1049,8 +1049,8 @@ public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiW
 	
 	@SideOnly(Side.CLIENT)
 	public void clientUpdate() {
-		if(schematicCache != null && schematicCache.getSchematic() != loadedSchematic)
-			schematicCache = null;
+		if(schematicWorldCache != null && schematicWorldCache.getSchematic() != loadedSchematic)
+			schematicWorldCache = null;
 		
 		if(state == BuilderState.CHOOSINGLOCAL)
 			updateSchematicChoosing();
@@ -1502,6 +1502,8 @@ public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiW
 			//ResourceItem resource = ResourceManager.getResource(this.resources, item.getSchematicBlockId(), item.getSchematicMeta());	
 			ResourceManager.setResource(this.resources, this.resourcesBackMap, item); //Will replace old item
 		}
+		if(resources.size() > 0 && schematicWorldCache != null)
+			schematicWorldCache.refreshBlocks(this.resources);
 		
 		updateGui();
 	}
@@ -1520,6 +1522,9 @@ public class TileSchematicBuilder extends TileEntity implements ITickable, IGuiW
 		for(ResourceItem item : resources) {
 			ResourceManager.setResource(this.resources, this.resourcesBackMap, item);
 		}
+		
+		if(schematicWorldCache != null)
+			schematicWorldCache.refreshBlocks(this.resources);
 		
 		this.updateGui();
 	}

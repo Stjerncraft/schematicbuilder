@@ -8,6 +8,7 @@ import com.wildex999.schematicbuilder.schematic.Schematic;
 import com.wildex999.schematicbuilder.tiles.TileSchematicBuilder;
 
 import io.netty.buffer.ByteBuf;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
@@ -129,40 +130,54 @@ public class MessageUploadSchematic extends MessageBase {
 	public static class Handler implements IMessageHandler<MessageUploadSchematic, IMessage> {
         
         @Override
-        public IMessage onMessage(MessageUploadSchematic message, MessageContext ctx) {
-        	World world = getWorld(ctx);
-        	TileEntity baseTile = message.tileInfo.getTileEntity(world);
-        	
-        	if(!(baseTile instanceof TileSchematicBuilder))
-        		return null;
-        	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
+        public IMessage onMessage(final MessageUploadSchematic message, final MessageContext ctx) {
+        	Runnable run = new Runnable() {
+				
+				@Override
+				public void run() {
+					World world = getWorld(ctx);
+		        	TileEntity baseTile = message.tileInfo.getTileEntity(world);
+		        	
+		        	if(!(baseTile instanceof TileSchematicBuilder))
+		        		return;
+		        	TileSchematicBuilder tile = (TileSchematicBuilder)baseTile;
 
-        	EntityPlayerMP player;
-        	if(ctx.side == Side.SERVER)
-        		player = ctx.getServerHandler().playerEntity;
-        	else
-        		player = null;
+		        	EntityPlayerMP player;
+		        	if(ctx.side == Side.SERVER)
+		        		player = ctx.getServerHandler().playerEntity;
+		        	else
+		        		player = null;
+		        	
+		        	switch(message.type) {
+		        	case START:
+		        		if(ctx.side == Side.SERVER)
+		        			tile.networkOnUploadStart(message.size, player);
+		        		else
+		        			tile.networkOnDownloadStart(message.size);
+		        		break;
+		        	case DATA:
+		        		if(ctx.side == Side.SERVER)
+		        			tile.networkOnUploadData(message.data, player);
+		        		else
+		        			tile.networkOnDownloadData(message.data);
+		        		break;
+		        	case END:
+		        		if(ctx.side == Side.SERVER)
+		        			tile.networkOnUploadEnd(player, message.abort);
+		        		else
+		        			tile.networkOnDownloadEnd(message.abort);
+		        		break;
+		        	}
+				}
+        	};
         	
-        	switch(message.type) {
-        	case START:
-        		if(ctx.side == Side.SERVER)
-        			tile.networkOnUploadStart(message.size, player);
-        		else
-        			tile.networkOnDownloadStart(message.size);
-        		break;
-        	case DATA:
-        		if(ctx.side == Side.SERVER)
-        			tile.networkOnUploadData(message.data, player);
-        		else
-        			tile.networkOnDownloadData(message.data);
-        		break;
-        	case END:
-        		if(ctx.side == Side.SERVER)
-        			tile.networkOnUploadEnd(player, message.abort);
-        		else
-        			tile.networkOnDownloadEnd(message.abort);
-        		break;
+        	if(ctx.side == Side.CLIENT)
+        		Minecraft.getMinecraft().addScheduledTask(run);
+        	else {
+        		EntityPlayerMP sendingPlayer = ctx.getServerHandler().playerEntity;
+        		sendingPlayer.getServerForPlayer().addScheduledTask(run);
         	}
+        	
         	
         	return null;
         }

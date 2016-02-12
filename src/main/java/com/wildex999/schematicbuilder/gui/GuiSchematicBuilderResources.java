@@ -20,6 +20,8 @@ import org.lwjgl.util.glu.Project;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.properties.IProperty;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -95,7 +97,7 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 	
 	private GuiListEntry lastEntryHover;
 	private int entryHoverTime;
-	private int entryHoveTimeMax = 20; //How long to hover over entry befor showing tooltip
+	private int entryHoveTimeMax = 1; //How long to hover over entry before showing tooltip
 	
 	private GuiButtonStretched buttonAll; //Show all Resources
 	private GuiButtonStretched buttonMissing; //Show Resources missing
@@ -553,8 +555,21 @@ public class GuiSchematicBuilderResources extends GuiScreenExt implements IGuiTa
 			
 			ResourceItem resource = resourceEntry.resource;
 			if(resource != null) {
+				IBlockState state = null;
+				try {
+					state = resource.getBlock().getStateFromMeta(resource.getMeta());
+				} catch(Exception e) {
+				}
 				textList.add("BlockID: " + resource.getBlockId() + ":" + resource.getMeta());
 				textList.add("Schematic BlockID: " + resource.getSchematicBlockId() + ":" + resource.getSchematicMeta());
+				if(state != null) {
+					textList.add("Attributes:");
+					for(Entry<IProperty, Comparable> attr : state.getProperties().entrySet()) {
+						textList.add("  " + attr.getKey().getName() + " : " + attr.getValue());
+					}
+				}
+				else
+					textList.add("Attributed: Unknown");
 				textList.add("--------");
 				textList.add("Missing: " + (resource.blockCount - resource.placedCount - resource.storedCount));
 				textList.add("Stored: " + resource.storedCount);
